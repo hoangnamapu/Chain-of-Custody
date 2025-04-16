@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+#REMINDER: IT HAS TO EXIT WITH NON-ZERO IF IT CRASHES/BREAKS IN A WEIRD WAY
+#Importing necessary modules
+
 import argparse
 import sys
 import os
@@ -16,22 +19,30 @@ import Summary
 import show_items
 
 #This is a test, to make sure I'm actually interacitng with the other files
-print(f"You know what is an overused number? {Data_Struct.funny_number()}")
+print(f"You know what is an overused number? {Data_Struct.funny_number()}.")
 
-
-#REMINDER: IT HAS TO EXIT WITH NON-ZERO IF IT CRASHES/BREAKS IN A WEIRD WAY
-#Importing necessary modules
 
 #Placeholder Command Handler Functions 
 #These will be filled in or replaced later, we just need a bare skeleton now.
 
 def handle_init(args):
-    print(f"Executing: init")
-    #Bare minimum: Check if BCHOC_FILE_PATH is set
-    if not os.environ.get('BCHOC_FILE_PATH'):
-         print("Warning: BCHOC_FILE_PATH environment variable not set.", file=sys.stderr)
-         #Don't exit yet in boilerplate, just warn
-    #TODO: Implement init logic
+
+    #Handles the 'init' command by calling the main initialization
+    #function from the init.py module.
+
+    try:
+        #Call the function defined in init.py
+        init.initialize_blockchain()
+        #If initialize_blockchain was successful, it already exited with 0.
+        #If it failed, it already exited with 1.
+        #This point should ideally not be reached. If it is, something is wrong in init.py
+        print("Internal Warning: init.initialize_blockchain completed without exiting.", file=sys.stderr)
+        sys.exit(1) #Exit with error if the init function didn't exit itself.
+    except Exception as e:
+        #Catch any unexpected errors that might occur *during the call*
+        #or if init.py somehow raises an error instead of exiting.
+        print(f"This error occured running init command, why is it here: {e}", file=sys.stderr)
+        sys.exit(1)
 
 def handle_add(args):
     print(f"Executing: add (Case: {args.c}, Items: {args.i}, Creator: {args.g})")
