@@ -1,7 +1,7 @@
 import os
 import hashlib
 import struct
-from Data_Struct import Block, BLOCK_SIZE, unpack_block
+from Data_Struct import Block #, BLOCK_SIZE, unpack_block Commented this out, issues w/ how it was done. Fixing code otherwise.
 
 def hash_block(block_bytes):
     """Compute SHA-256 hash of a block (used for prev_hash linkage)."""
@@ -19,8 +19,8 @@ def verify():
     try:
         with open(filepath, "rb") as f:
             while True:
-                block_bytes = f.read(BLOCK_SIZE)
-                if not block_bytes or len(block_bytes) < BLOCK_SIZE:
+                block_bytes = f.read(Block.BLOCK_SIZE)
+                if not block_bytes or len(block_bytes) < Block.BLOCK_SIZE:
                     break
                 blocks.append(block_bytes)
     except Exception as e:
@@ -39,7 +39,7 @@ def verify():
 
     for i in range(len(blocks)):
         curr_block_bytes = blocks[i]
-        curr_block = unpack_block(curr_block_bytes)
+        curr_block = Block.unpack_block(curr_block_bytes)
         curr_hash = hash_block(curr_block_bytes)
 
         # Rule 1: prev_hash must match
