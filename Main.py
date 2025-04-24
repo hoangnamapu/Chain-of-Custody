@@ -79,6 +79,11 @@ def handle_remove(args):
 def handle_verify(args):
     print(f"Executing: verify")
     #TODO: Implement verify logic
+    try:
+        verify.verify()    
+    except Exception as e:
+        print(f"An unexpected error occurred while running the verify command: {e}", file=sys.stderr)
+        sys.exit(1)
 
 def handle_summary(args):
     print(f"Executing: summary (Case: {args.c})")
