@@ -25,6 +25,10 @@ print(f"You know what is an overused number? {Data_Struct.funny_number()}.")
 #Placeholder Command Handler Functions 
 #These will be filled in or replaced later, we just need a bare skeleton now.
 
+#NOTE: IF you get CRITICAL: BHOC_FILE_PATH NOT SET, it means you need to set the BCHOC_FILE_PATH environment variable
+#command: export BCHOC_FILE_PATH="chain.bin"
+#TODO: implement this somehow, maybe in make file, to prevent this in the future.
+
 def handle_init(args):
 
     #Handles the 'init' command by calling the main initialization
