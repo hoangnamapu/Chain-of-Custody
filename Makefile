@@ -31,3 +31,8 @@ clean:
 	@echo "Cleanup complete."
 
 .PHONY: all clean
+
+#This is just here for easy finding for the team and myself.
+#export BCHOC_FILE_PATH="chain.bin"
+#export BCHOC_PASSWORD_POLICE="P80P"
+#export BCHOC_PASSWORD_CREATOR="C67C"

@@ -9,6 +9,7 @@ import os
 #THESE ARE THE FILE IMPORTS, BE SURE TO UPDATE IF MORE GET ADDED OR IF I MISSED ONE
 import Data_Struct
 import init
+import add
 import checkout
 import checkin
 import remove
@@ -19,7 +20,7 @@ import Summary
 import show_items
 
 #This is a test, to make sure I'm actually interacitng with the other files
-print(f"You know what is an overused number? {Data_Struct.funny_number()}.")
+# print(f"You know what is an overused number? {Data_Struct.funny_number()}.")
 
 
 #Placeholder Command Handler Functions 
@@ -50,6 +51,20 @@ def handle_init(args):
 
 def handle_add(args):
     print(f"Executing: add (Case: {args.c}, Items: {args.i}, Creator: {args.g})")
+    
+    try:
+        add.handle_add(args)
+        #If add.handle_add was successful, it already exited with 0.
+        #If it failed, it already exited with 1.    
+        #This point should ideally not be reached. If it is, something is wrong in add.py
+        print("Internal Warning: add.handle_add completed without exiting.", file=sys.stderr)
+        sys.exit(1) #Exit with error if the add function didn't exit itself.
+    except Exception as e:
+        #Catch any unexpected errors that might occur *during the call*
+        #or if add.py somehow raises an error instead of exiting.
+        print(f"An unexpected error occurred while running the add command: {e}", file=sys.stderr)
+        sys.exit(1)
+
     #TODO: Implement add logic
 
 def handle_checkout(args):
@@ -62,6 +77,17 @@ def handle_checkin(args):
 
 def handle_show_cases(args):
     print(f"Executing: show cases")
+    try:
+        show_cases.handle_show_cases(args)
+        #If show_cases.handle_show_cases was successful, it already exited with 0.
+        #If it failed, it already exited with 1.
+        #This point should ideally not be reached. If it is, something is wrong in show_cases.py
+        print("Internal Warning: show_cases.handle_show_cases completed without exiting.", file=sys.stderr)
+        sys.exit(1) #Exit with error if the show_cases function didn't exit itself.
+
+    except Exception as e:
+        print(f"An unexpected error occurred while running the show cases command: {e}", file=sys.stderr)
+        sys.exit(1)
     #TODO: Implement show cases logic
 
 def handle_show_items(args):
