@@ -179,7 +179,7 @@ def get_all_item_ids(filepath: str) -> set[int]:
                      #Original data was 4 bytes, little-endian. Unpadding may return more than 4 bytes.
                      #We only care about the first 4 bytes for the integer conversion.
                      original_bytes = decrypted_padded_bytes[:4]
-                     item_id_int = int.from_bytes(original_bytes, 'little')
+                     item_id_int = int.from_bytes(original_bytes, 'big')
                      seen_item_ids.add(item_id_int)
 
                  except (ValueError, TypeError):

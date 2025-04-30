@@ -88,29 +88,43 @@ def funny_number():
 #--- Genesis Block Creation ---
 
 def create_genesis_block_bytes() -> bytes:
-    prev_hash = bytes(PREV_HASH_SIZE)
-    timestamp = 0.0
-    case_id = bytes(CASE_ID_SIZE)
 
-    # Encrypt the 4-byte integer 0 (big-endian) for Genesis Evidence ID
-    genesis_item_id_value_int = 0
-    genesis_item_id_value_bytes_4 = genesis_item_id_value_int.to_bytes(4, 'big')
-    encrypted_evidence_id_genesis_16 = encrypt_aes_ecb(PROJECT_AES_KEY, genesis_item_id_value_bytes_4)
-    evidence_id = encrypted_evidence_id_genesis_16.ljust(EVIDENCE_ID_SIZE, b'\0')
+    # I am losing it
+    prev_hash = bytes(PREV_HASH_SIZE) # 32 zero bytes as per '0' in table
+    timestamp = 0.0 # 8 byte float zero as per '0' in table
 
-    state = b"INITIAL\0\0\0\0\0"
-    creator = bytes(CREATOR_SIZE)
-    owner = bytes(OWNER_SIZE)
-    data_length = 14
-    data = b"Initial block\0"
+    # --- FIX for Genesis Case ID Literal (#001, #002, #003, #007, #008, #009 failures) ---
+    case_id_bytes = b'0' * CASE_ID_SIZE # 32 bytes of ASCII '0' characters
+
+
+    # --- FIX for Genesis Evidence ID Literal (#001, #002, #003, #007, #008, #009 failures) ---
+    evidence_id_bytes = b'0' * EVIDENCE_ID_SIZE # 32 bytes of ASCII '0' characters
+
+
+    state_bytes = b"INITIAL\0\0\0\0\0" # EXACT 12-byte literal from the table
+    creator_bytes = b'\x00' * CREATOR_SIZE # 12 null bytes as per literal in table
+    owner_bytes = b'\x00' * OWNER_SIZE # 12 null bytes as per literal in table
+
+    data_length = 14 # 4 byte integer as per specified value
+    data = b"Initial block\0" # 14 bytes as per specified value
 
     try:
+        # Pack the header using the defined format and the exact byte literals
         packed_header = struct.pack(
             BLOCK_HEADER_FORMAT,
-            prev_hash, timestamp, case_id, evidence_id, state, creator, owner, data_length
+            prev_hash,
+            timestamp,
+            case_id_bytes, # Use the 32 ASCII '0' bytes
+            evidence_id_bytes, # Use the 32 ASCII '0' bytes
+            state_bytes, # Use the 12-byte literal
+            creator_bytes, # Use the 12 null bytes
+            owner_bytes, # Use the 12 null bytes
+            data_length
         )
+        # Concatenate header and data
         return packed_header + data
     except struct.error as e:
+        # This failure should not happen with fixed data unless BLOCK_HEADER_FORMAT is wrong
         raise RuntimeError(f"Internal error: Failed to pack genesis block: {e}") from e
 
 #--- Block Class (For non-Genesis blocks) ---
@@ -198,7 +212,7 @@ class Block:
         encrypted_uuid_16 = encrypt_aes_ecb(aes_key, case_id.bytes)
         self.encrypted_case_id = encrypted_uuid_16.ljust(CASE_ID_SIZE, b'\0')
 
-        evidence_id_bytes_4 = evidence_item_id.to_bytes(4, 'little')
+        evidence_id_bytes_4 = evidence_item_id.to_bytes(4, 'big')
         encrypted_evidence_id_16 = encrypt_aes_ecb(aes_key, evidence_id_bytes_4)
         self.encrypted_evidence_id = encrypted_evidence_id_16.ljust(EVIDENCE_ID_SIZE, b'\0')
 
@@ -289,7 +303,7 @@ class Block:
             original_bytes = decrypted_padded_bytes[:4]
             if len(original_bytes) < 4:
                 raise ValueError("Decrypted bytes insufficient for 4-byte integer conversion")
-            return int.from_bytes(original_bytes, 'little')
+            return int.from_bytes(original_bytes, 'big')
         except (ValueError, TypeError, Exception): #Catch decryption/int conversion errors
             return None #Indicate failure
 
