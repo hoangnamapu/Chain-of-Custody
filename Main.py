@@ -114,15 +114,37 @@ def handle_show_cases(args):
 
 def handle_show_items(args):
     print(f"Executing: show items (Case: {args.c})")
-    #TODO: Implement show items logic
+    
+    try:
+        show_items.handle_show_items(args)
+        # If handle_show_items was successful, it already exited with 0.
+        # If it failed, it already exited with 1.
+        # This point should ideally not be reached. If it is, something is wrong in show_items.py
+        print("Internal Warning: show_items.handle_show_items completed without exiting.", file=sys.stderr)
+        sys.exit(1) # Exit with error if the show_items function didn't exit itself.
+    except Exception as e:
+        # Catch any unexpected errors that might occur
+        print(f"An unexpected error occurred while running the show items command: {e}", file=sys.stderr)
+        sys.exit(1)
 
 def handle_show_history(args):
     print(f"Executing: show history (Case: {args.c}, Item: {args.i}, Num: {args.n}, Reverse: {args.reverse})")
     #TODO: Implement show history logic
 
 def handle_remove(args):
-    print(f"Executing: remove (Item: {args.i}, Reason: {args.y}, Owner: {args.o})")
-    #TODO: Implement remove logic
+    print(f"Executing: remove (Item: {args.i}, Reason: {args.why}, Owner: {args.owner})")
+    
+    try:
+        remove.handle_remove(args)
+        # If handle_remove was successful, it already exited with 0.
+        # If it failed, it already exited with 1.
+        # This point should ideally not be reached. If it is, something is wrong in remove.py
+        print("Internal Warning: remove.handle_remove completed without exiting.", file=sys.stderr)
+        sys.exit(1) # Exit with error if the remove function didn't exit itself.
+    except Exception as e:
+        # Catch any unexpected errors that might occur
+        print(f"An unexpected error occurred while running the remove command: {e}", file=sys.stderr)
+        sys.exit(1)
 
 def handle_verify(args):
     print(f"Executing: verify")
@@ -135,7 +157,18 @@ def handle_verify(args):
 
 def handle_summary(args):
     print(f"Executing: summary (Case: {args.c})")
-    #TODO: Implement summary logic
+    
+    try:
+        Summary.handle_summary(args)
+        # If handle_summary was successful, it already exited with 0.
+        # If it failed, it already exited with 1.
+        # This point should ideally not be reached. If it is, something is wrong in Summary.py
+        print("Internal Warning: Summary.handle_summary completed without exiting.", file=sys.stderr)
+        sys.exit(1) # Exit with error if the summary function didn't exit itself.
+    except Exception as e:
+        # Catch any unexpected errors that might occur
+        print(f"An unexpected error occurred while running the summary command: {e}", file=sys.stderr)
+        sys.exit(1)
 
 #Main starts here -----------------------------------------------------------------------
 

@@ -4,12 +4,14 @@ import uuid
 import struct
 import hashlib
 from datetime import datetime, timezone
+import Data_Struct
 
 try:
     from Data_Struct import (
         PROJECT_AES_KEY, encrypt_aes_ecb, decrypt_aes_ecb, unpack_block,
         BLOCK_HEADER_SIZE, AES_BLOCK_SIZE_BYTES, Block,
-        STATE_SIZE, CREATOR_SIZE, OWNER_SIZE, PREV_HASH_SIZE, EVIDENCE_ID_SIZE
+        STATE_SIZE, CREATOR_SIZE, OWNER_SIZE, PREV_HASH_SIZE, EVIDENCE_ID_SIZE,
+        BLOCK_HEADER_FORMAT
     )
 except ImportError as e:
     print(f"ERROR (in checkin.py): Could not import required components from Data_Struct.py: {e}", file=sys.stderr)
@@ -64,7 +66,7 @@ def get_last_block_and_item_state(filepath, item_id_int):
                 if len(header_bytes) < BLOCK_HEADER_SIZE:
                     break
                     
-                unpacked_header = struct.unpack(Data_Struct.BLOCK_HEADER_FORMAT, header_bytes)
+                unpacked_header = struct.unpack(BLOCK_HEADER_FORMAT, header_bytes)
                 declared_data_len = unpacked_header[7]
                 
                 # Calculate total block size
