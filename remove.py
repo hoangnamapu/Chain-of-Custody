@@ -82,8 +82,9 @@ def get_last_block_and_item_state(filepath, item_id_int):
                     
                     # Check if this block is for our item
                     try:
-                        encrypted_evidence_id = block_data['encrypted_evidence_id'][:16]
-                        decrypted_padded_bytes = decrypt_aes_ecb(PROJECT_AES_KEY, encrypted_evidence_id.encode('utf-8') if isinstance(encrypted_evidence_id, str) else encrypted_evidence_id)
+                        # The evidence ID is stored as a hex string in unpack_block
+                        encrypted_evidence_id = bytes.fromhex(block_data['encrypted_evidence_id'])
+                        decrypted_padded_bytes = decrypt_aes_ecb(PROJECT_AES_KEY, encrypted_evidence_id)
                         original_bytes = decrypted_padded_bytes[:4]
                         if len(original_bytes) < 4:
                             raise ValueError("Decrypted bytes insufficient for integer conversion")
