@@ -69,11 +69,33 @@ def handle_add(args):
 
 def handle_checkout(args):
     print(f"Executing: checkout (Item: {args.i})")
-    #TODO: Implement checkout logic
+    
+    try:
+        checkout.handle_checkout(args)
+        # If handle_checkout was successful, it already exited with 0.
+        # If it failed, it already exited with 1.
+        # This point should ideally not be reached. If it is, something is wrong in checkout.py
+        print("Internal Warning: checkout.handle_checkout completed without exiting.", file=sys.stderr)
+        sys.exit(1) # Exit with error if the checkout function didn't exit itself.
+    except Exception as e:
+        # Catch any unexpected errors that might occur
+        print(f"An unexpected error occurred while running the checkout command: {e}", file=sys.stderr)
+        sys.exit(1)
 
 def handle_checkin(args):
     print(f"Executing: checkin (Item: {args.i})")
-    #TODO: Implement checkin logic
+    
+    try:
+        checkin.handle_checkin(args)
+        # If handle_checkin was successful, it already exited with 0.
+        # If it failed, it already exited with 1.
+        # This point should ideally not be reached. If it is, something is wrong in checkin.py
+        print("Internal Warning: checkin.handle_checkin completed without exiting.", file=sys.stderr)
+        sys.exit(1) # Exit with error if the checkin function didn't exit itself.
+    except Exception as e:
+        # Catch any unexpected errors that might occur
+        print(f"An unexpected error occurred while running the checkin command: {e}", file=sys.stderr)
+        sys.exit(1)
 
 def handle_show_cases(args):
     print(f"Executing: show cases")
