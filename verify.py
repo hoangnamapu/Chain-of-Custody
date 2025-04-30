@@ -17,7 +17,7 @@ def verify():
         print("Blockchain file not found.")
         print("Transactions in blockchain: 0")
         print("State of blockchain: CLEAN")
-        sys.exit(0)
+        sys.exit(1)
 
     blocks_bytes = []
     try:
@@ -55,6 +55,12 @@ def verify():
         sys.exit(1)
 
     print(f"Transactions in blockchain: {len(blocks_bytes)}")
+
+    if len(blocks_bytes) == 0:
+        print("ERROR")
+        print("No valid blocks found in blockchain file.", file=sys.stderr)
+        print("State of blockchain: ERROR")
+        sys.exit(1)
 
     prev_block_hash_expected = b'\x00' * PREV_HASH_SIZE  # Genesis block
     seen_parent_hashes = set()
