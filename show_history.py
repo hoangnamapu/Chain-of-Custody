@@ -93,11 +93,14 @@ def get_blockchain_history(filepath, case_id_filter=None, item_id_filter=None):
                             block_case_id = uuid.UUID(bytes=uuid_bytes)
                             
                             # Extract and decrypt item ID
-                            encrypted_evidence_id = block_data['encrypted_evidence_id'][:16]
-                            decrypted_padded_bytes = decrypt_aes_ecb(
-                                PROJECT_AES_KEY, 
-                                encrypted_evidence_id.encode('utf-8') if isinstance(encrypted_evidence_id, str) else encrypted_evidence_id
-                            )
+                            # Convert hex string to bytes if necessary
+                            encrypted_evidence_id = block_data['encrypted_evidence_id']
+                            evidence_id_bytes = bytes.fromhex(encrypted_evidence_id) if isinstance(encrypted_evidence_id, str) else encrypted_evidence_id
+                            
+                            # Only use the first 16 bytes (AES block size)
+                            evidence_id_bytes = evidence_id_bytes[:16] if len(evidence_id_bytes) >= 16 else evidence_id_bytes
+                            
+                            decrypted_padded_bytes = decrypt_aes_ecb(PROJECT_AES_KEY, evidence_id_bytes)
                             original_bytes = decrypted_padded_bytes[:4]
                             if len(original_bytes) < 4:
                                 raise ValueError("Decrypted bytes insufficient for integer conversion")

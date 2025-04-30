@@ -83,8 +83,13 @@ def get_last_block_and_item_state(filepath, item_id_int):
                     # Check if this block is for our item
                     try:
                         # The evidence ID is stored as a hex string in unpack_block
-                        encrypted_evidence_id = bytes.fromhex(block_data['encrypted_evidence_id'])
-                        decrypted_padded_bytes = decrypt_aes_ecb(PROJECT_AES_KEY, encrypted_evidence_id)
+                        encrypted_evidence_id = block_data['encrypted_evidence_id']
+                        evidence_id_bytes = bytes.fromhex(encrypted_evidence_id) if isinstance(encrypted_evidence_id, str) else encrypted_evidence_id
+                        
+                        # Only use the first 16 bytes (AES block size)
+                        evidence_id_bytes = evidence_id_bytes[:16] if len(evidence_id_bytes) >= 16 else evidence_id_bytes
+                        
+                        decrypted_padded_bytes = decrypt_aes_ecb(PROJECT_AES_KEY, evidence_id_bytes)
                         original_bytes = decrypted_padded_bytes[:4]
                         if len(original_bytes) < 4:
                             raise ValueError("Decrypted bytes insufficient for integer conversion")
@@ -178,6 +183,11 @@ def handle_remove(args):
     if reason == "RELEASED" and not owner_info:
         print("Error: Owner information (-o) must be provided when reason is RELEASED.", file=sys.stderr)
         sys.exit(1)
+        
+    # Set owner role based on the removal reason
+    owner_role = ""
+    if reason == "RELEASED" and owner_info:
+        owner_role = "Police"  # Default owner for RELEASED items
     
     # Add a new block with the removal state
     try:
@@ -192,7 +202,7 @@ def handle_remove(args):
                 evidence_item_id=item_id_int,
                 state=reason,  # Use the reason (DISPOSED, DESTROYED, or RELEASED)
                 creator=creator,
-                owner="",  # Empty owner for removal
+                owner=owner_role,  # Use determined owner role
                 data=data,
                 aes_key=PROJECT_AES_KEY
             )

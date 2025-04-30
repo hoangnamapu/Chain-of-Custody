@@ -320,7 +320,8 @@ def handle_add(args):
     try:
         with open(blockchain_file_path, 'ab') as f:
             for i, item_id in enumerate(item_ids_int):
-                # For the first non-genesis block, set prev_hash=0 (not b'\x00'*32)
+                # For the block that follows the genesis block, set prev_hash=0 (not b'\x00'*32)
+                # In all other cases, use the hash of the last block
                 if block_count == 1 and i == 0:
                     prev_hash_for_block = 0
                 else:

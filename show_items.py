@@ -83,11 +83,14 @@ def get_case_items(filepath, case_id_uuid):
                             # Check if this block belongs to our case
                             if block_case_id == case_id_uuid:
                                 # Extract and decrypt the item ID
-                                encrypted_evidence_id = bytes.fromhex(block_data['encrypted_evidence_id'])
-                                decrypted_padded_bytes = decrypt_aes_ecb(
-                                    PROJECT_AES_KEY, 
-                                    encrypted_evidence_id
-                                )
+                                # Convert hex string to bytes if necessary
+                                encrypted_evidence_id = block_data['encrypted_evidence_id']
+                                evidence_id_bytes = bytes.fromhex(encrypted_evidence_id) if isinstance(encrypted_evidence_id, str) else encrypted_evidence_id
+                                
+                                # Only use the first 16 bytes (AES block size)
+                                evidence_id_bytes = evidence_id_bytes[:16] if len(evidence_id_bytes) >= 16 else evidence_id_bytes
+                                
+                                decrypted_padded_bytes = decrypt_aes_ecb(PROJECT_AES_KEY, evidence_id_bytes)
                                 original_bytes = decrypted_padded_bytes[:4]
                                 item_id = int.from_bytes(original_bytes, 'big')
                                 
