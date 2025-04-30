@@ -198,7 +198,7 @@ def main():
     #add 
     parser_add = subparsers.add_parser('add', help='Add a new evidence item')
     parser_add.add_argument('-c', type=str, required=True, help='Case ID (UUID format)')
-    parser_add.add_argument('-i', type=str, required=True, nargs='+', help='Item ID(s)')
+    parser_add.add_argument('-i', type=str, required=True, action='append', help='Item ID(s)')
     parser_add.add_argument('-g', type=str, required=True, help='Creator name')
     parser_add.add_argument('-p', type=str, required=True, help="Password")
     parser_add.set_defaults(func=handle_add)
@@ -282,4 +282,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
