@@ -198,8 +198,8 @@ class Block:
         self.timestamp_float = datetime.now(timezone.utc).timestamp()
         self.timestamp_iso = datetime.fromtimestamp(self.timestamp_float, timezone.utc).isoformat()
 
-        encrypted_uuid_16 = encrypt_aes_ecb(aes_key, case_id.bytes)
-        self.encrypted_case_id = encrypted_uuid_16.ljust(CASE_ID_SIZE, b'\0')
+        # Store the raw 16 UUID bytes, padded to 32 bytes (no encryption for case_id)
+        self.encrypted_case_id = case_id.bytes.ljust(CASE_ID_SIZE, b'\0')
 
         evidence_id_bytes_4 = evidence_item_id.to_bytes(4, 'big')
         encrypted_evidence_id_16 = encrypt_aes_ecb(aes_key, evidence_id_bytes_4)
@@ -265,24 +265,16 @@ class Block:
     #after password validation provides the necessary context/permission.
 
     def decrypt_case_id(self, key: bytes = None) -> uuid.UUID | None:
-        
-        #Attempts to decrypt the Case ID using the provided key, or the key
-        #used during block initialization if key is None. Returns None on failure.
-        
-        use_key = key if key is not None else self._aes_key
-        if not use_key: return None #Cannot decrypt without a key
         try:
-            #The actual ciphertext is the first 16 bytes before padding
-            decrypted_bytes = decrypt_aes_ecb(use_key, self.encrypted_case_id[:AES_BLOCK_SIZE_BYTES])
-            return uuid.UUID(bytes=decrypted_bytes)
-        except (ValueError, TypeError, Exception): #Catch decryption/UUID creation errors
-            return None #Indicate failure
+            uuid_bytes = self.encrypted_case_id[:16]
+            if len(uuid_bytes) != 16:
+                return None
+            return uuid.UUID(bytes=uuid_bytes)
+        except (ValueError, TypeError, Exception):
+            return None
 
     def decrypt_evidence_id(self, key: bytes = None) -> int | None:
-        """
-        Attempts to decrypt the Evidence ID using the provided key, or the key
-        used during block initialization if key is None. Returns None on failure.
-        """
+       
         use_key = key if key is not None else self._aes_key
         if not use_key: return None #Cannot decrypt without a key
         try:
@@ -353,8 +345,8 @@ def unpack_block(block_bytes: bytes) -> dict | None:
         block_dict = {
             'previous_hash': prev_hash_display,
             'timestamp_float': timestamp_val,
-            'encrypted_case_id': unpacked_header[2],
-            'encrypted_evidence_id': unpacked_header[3],
+            'encrypted_case_id': unpacked_header[2],  # This is the raw 16 UUID bytes padded to 32 now
+            'encrypted_evidence_id': unpacked_header[3][:16].hex(),
             'state': unpacked_header[4],         #Raw bytes state field
             'creator': unpacked_header[5],       #Raw bytes creator field
             'owner': unpacked_header[6],         #Raw bytes owner field
