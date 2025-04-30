@@ -5,13 +5,17 @@ import struct
 import hashlib #To calculate hash of the previous block
 from datetime import datetime, timezone #For block timestamp
 import Data_Struct
+import binascii  # Add this at the top if not already present
 
 try:
     #Import necessary components from Data_Struct
     from Data_Struct import (
         PROJECT_AES_KEY, encrypt_aes_ecb, decrypt_aes_ecb, unpack_block,
         BLOCK_HEADER_SIZE, AES_BLOCK_SIZE_BYTES,
-        STATE_SIZE, CREATOR_SIZE, OWNER_SIZE, PREV_HASH_SIZE, EVIDENCE_ID_SIZE #Needed for padding/handling raw bytes
+        STATE_SIZE, CREATOR_SIZE, OWNER_SIZE, PREV_HASH_SIZE, EVIDENCE_ID_SIZE, #Needed for padding/handling raw bytes
+        BLOCK_HEADER_FORMAT
+        make_encrypted_evidence_id,
+        debug_reverse_evidence_id # Ensure this is imported if used below
     )
     #Import the Block class for creating new block objects
     from Data_Struct import Block #Import the Block class explicitly
@@ -85,7 +89,7 @@ def get_last_block_info(filepath: str) -> tuple[bytes, int]:
                          raise ValueError(f"File truncated or corrupt: Incomplete header at offset {current_pos}")
 
                 try:
-                    unpacked_header = struct.unpack(Data_Struct.BLOCK_HEADER_FORMAT, header_bytes)
+                    unpacked_header = struct.unpack(BLOCK_HEADER_FORMAT, header_bytes)
                     declared_data_len = unpacked_header[7]
                 except struct.error:
                     raise ValueError(f"File corrupt: Cannot unpack header at offset {current_pos}")
@@ -128,82 +132,92 @@ def get_last_block_info(filepath: str) -> tuple[bytes, int]:
         raise RuntimeError(f"An unexpected error occurred while finding the last block: {e}") from e
 
 def get_all_item_ids(filepath: str) -> set[int]:
-    #Reads the blockchain file, attempts to decrypt all evidence item IDs,
-    #and returns a set of unique decrypted integer item IDs.
-    #Uses the PROJECT_AES_KEY for decryption. Does NOT require a user password here.
-    #Handles file reading errors internally and exits.
     seen_item_ids = set()
-
     try:
         if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
-             return seen_item_ids #Return empty set if no file or empty
-
+            return seen_item_ids
         with open(filepath, 'rb') as f:
             file_size = os.path.getsize(filepath)
             current_pos = 0
-
             while current_pos < file_size:
-                 f.seek(current_pos)
-                 header_bytes = f.read(BLOCK_HEADER_SIZE)
-                 if len(header_bytes) < BLOCK_HEADER_SIZE:
-                     #Check if it's just the very end of the file after the last block
-                     if current_pos + len(header_bytes) == file_size:
-                         break #Reached end of file cleanly after last block
-                     else:
-                          print(f"Error reading existing item IDs: Incomplete header at offset {current_pos}.", file=sys.stderr)
-                          sys.exit(1) #Exit on file corruption
 
-                 try:
-                     unpacked_header = struct.unpack(Data_Struct.BLOCK_HEADER_FORMAT, header_bytes)
-                     declared_data_len = unpacked_header[7]
-                 except struct.error:
-                      print(f"Error reading existing item IDs: Cannot unpack header at offset {current_pos}.", file=sys.stderr)
-                      sys.exit(1) #Exit on file corruption
+                f.seek(current_pos)
+                header_bytes = f.read(BLOCK_HEADER_SIZE)
+                if len(header_bytes) < BLOCK_HEADER_SIZE:
+                    break
+                unpacked_header = struct.unpack(BLOCK_HEADER_FORMAT, header_bytes)
+                declared_data_len = unpacked_header[7]
+                block_size = BLOCK_HEADER_SIZE + declared_data_len
+                encrypted_evidence_id_ascii_padded = unpacked_header[3]  # 32 bytes ASCII field
 
-                 block_size = BLOCK_HEADER_SIZE + declared_data_len
-                 if current_pos + block_size > file_size:
-                      print(f"Error reading existing item IDs: Block data incomplete at offset {current_pos}.", file=sys.stderr)
-                      sys.exit(1) #Exit on file truncation/corruption
 
-                 #We have the header_bytes (containing encrypted_evidence_id at index 3)
-                 encrypted_evidence_id_padded = unpacked_header[3]
+                # Skip genesis block
+                if encrypted_evidence_id_ascii_padded == b'0' * EVIDENCE_ID_SIZE:
+                    current_pos += block_size
+                    continue
 
-                 #Attempt decryption
-                 try:
-                     #Use only the first AES_BLOCK_SIZE_BYTES of the padded encrypted data
-                     #The encrypted evidence ID is 16 bytes, padded to 32.
-                     decrypted_padded_bytes = decrypt_aes_ecb(
-                         PROJECT_AES_KEY,
-                         encrypted_evidence_id_padded[:AES_BLOCK_SIZE_BYTES]
-                     )
-                     #Original data was 4 bytes, big-endian. Unpadding may return more than 4 bytes.
-                     #We only care about the first 4 bytes for the integer conversion.
-                     original_bytes = decrypted_padded_bytes[:4]
-                     item_id_int = int.from_bytes(original_bytes, 'big')
-                     seen_item_ids.add(item_id_int)
+                try:
+                    # 1. Strip potential null padding
+                    encrypted_evidence_id_ascii = encrypted_evidence_id_ascii_padded.rstrip(b'\0')
 
-                 except (ValueError, TypeError):
-                      #Decryption failed (wrong key or corrupt data) or conversion to int failed.
-                      #This block's item ID is likely unusable or corrupt. Skip it.
-                      pass #Skip silently as per one-error guidance unless critical
+                    # 2. Decode ASCII to get the hex string
+                    hex_string = encrypted_evidence_id_ascii.decode('ascii')
 
-                 except Exception as e:
-                      #Catch any other unexpected errors during decryption/conversion
-                      print(f"Warning: Unexpected error decrypting item ID at offset {current_pos}: {e}", file=sys.stderr)
-                      pass #Still skip this item
+                    # 3. Convert hex string back to bytes. Should yield 16 bytes if not truncated badly.
+                    if len(hex_string) % 2 != 0:
+                         raise ValueError(f"Invalid hex string length ({len(hex_string)}) for evidence ID.")
+                    ciphertext_bytes = bytes.fromhex(hex_string)
 
-                 current_pos += block_size #Move to the next block
+                    # --- Validation ---
+                    if len(ciphertext_bytes) % AES_BLOCK_SIZE_BYTES != 0:
+                         raise ValueError(f"Ciphertext length ({len(ciphertext_bytes)}) is not a multiple of AES block size for evidence ID.")
 
-    except IOError as e:
-         #Catch errors during file reading itself
-         print(f"Error reading blockchain file '{filepath}' for item IDs: {e}", file=sys.stderr)
-         sys.exit(1) #Exit on file read errors
+                    # 4. Decrypt using standard AES ECB
+                    decrypted_padded_bytes = decrypt_aes_ecb(PROJECT_AES_KEY, ciphertext_bytes)
 
+                    # 5. Extract original 4 bytes
+                    original_bytes = decrypted_padded_bytes[:4]
+                    if len(original_bytes) < 4:
+                         raise ValueError("Decrypted evidence ID too short.")
+
+                    # 6. Convert back to integer
+                    item_id_int = int.from_bytes(original_bytes, 'big')
+                    seen_item_ids.add(item_id_int)
+
+                except (UnicodeDecodeError, binascii.Error, ValueError, struct.error) as e:
+                    print(f"DEBUG: Error processing evidence_id at offset {current_pos}: {e}. Skipping block.", file=sys.stderr)
+                    Data_Struct.debug_reverse_evidence_id(encrypted_evidence_id_ascii_padded)
+                except Exception as e:
+                    print(f"DEBUG: Unexpected exception processing evidence_id at offset {current_pos}: {e}. Skipping block.", file=sys.stderr)
+                    Data_Struct.debug_reverse_evidence_id(encrypted_evidence_id_ascii_padded)
+
+                current_pos += block_size
     except Exception as e:
-         print(f"An unexpected error occurred while collecting item IDs: {e}", file=sys.stderr)
-         sys.exit(1)
-
+        print(f"Error reading blockchain file '{filepath}' for item IDs: {e}", file=sys.stderr)
+        sys.exit(1)
     return seen_item_ids
+
+def evidence_id_exists(filepath: str, item_id: int) -> bool:
+    target_encrypted = make_encrypted_evidence_id(item_id)
+    try:
+        with open(filepath, 'rb') as f:
+            file_size = os.path.getsize(filepath)
+            current_pos = 0
+            while current_pos < file_size:
+                f.seek(current_pos)
+                header_bytes = f.read(BLOCK_HEADER_SIZE)
+                if len(header_bytes) < BLOCK_HEADER_SIZE:
+                    break
+                unpacked_header = struct.unpack(BLOCK_HEADER_FORMAT, header_bytes)
+                declared_data_len = unpacked_header[7]
+                block_size = BLOCK_HEADER_SIZE + declared_data_len
+                encrypted_evidence_id = unpacked_header[3]
+                if encrypted_evidence_id == target_encrypted:
+                    return True
+                current_pos += block_size
+    except Exception:
+        pass
+    return False
 
 def handle_add(args):
     #Handles the 'bchoc add' command.
@@ -264,13 +278,16 @@ def handle_add(args):
 
     #--- 4. Check for Duplicate Item IDs in Existing Chain ---
     #Read all existing item IDs from the file *before* attempting to add.
-    #get_all_item_ids handles file read errors internally by exiting.
     existing_item_ids = get_all_item_ids(blockchain_file_path)
-
     for item_id in item_ids_int:
         if item_id in existing_item_ids:
             print(f"Error: Item ID '{item_id}' already exists in the blockchain.", file=sys.stderr)
             sys.exit(1) #Non-zero exit for duplicate item ID
+
+    for item_id in item_ids_int:
+        if evidence_id_exists(blockchain_file_path, item_id):
+            print(f"Error: Item ID '{item_id}' already exists in the blockchain.", file=sys.stderr)
+            sys.exit(1)
 
     #--- 5. Handle File Existence and Get Hash of the Last Block ---
     file_exists = os.path.exists(blockchain_file_path)
@@ -295,6 +312,7 @@ def handle_add(args):
             #After creating genesis, the last hash for the *first* item block
             #will be the hash of this newly created genesis block.
             last_hash_for_new_block = hashlib.sha256(genesis_bytes).digest()
+            block_count = 1  # <-- Add this line to fix the error
             #file_exists is now True and file size is > 0
 
         except (IOError, RuntimeError) as e:
@@ -315,58 +333,65 @@ def handle_add(args):
             sys.exit(1)
 
     #--- 6. Add Each Item as a New Block ---
-    #Open the file in append mode. 'ab' ensures we write bytes and append to the end.
-    #We keep it open while adding multiple items for efficiency.
     try:
         with open(blockchain_file_path, 'ab') as f:
-            #Iterate through each validated item ID
             for i, item_id in enumerate(item_ids_int):
-                #--- FIX: Provide a valid default owner string ---
-                #Based on Block.__init__ validation and CHECKEDIN state implication.
-                #The spec doesn't explicitly state the owner for 'add' blocks,
-                #but the Block class requires it to be one of the allowed roles.
-                default_owner_for_add = "Police" #Choose one of the ALLOWED_OWNERS
+                # For the block that follows the genesis block, set prev_hash=0 (not b'\x00'*32)
+                # In all other cases, use the hash of the last block
+                if block_count == 1 and i == 0:
+                    prev_hash_for_block = 0
+                else:
+                    prev_hash_for_block = last_hash_for_new_block
 
-                #Create the Block instance
-                #state is automatically CHECKEDIN for new additions
-                #data is b'' and data_length is 0 for add command blocks
+                default_owner_for_add = "" # or "" if your Block class allows it
+
                 try:
                     new_block = Block(
-                        previous_hash=last_hash_for_new_block, #Use the hash from the previous block
+                        previous_hash=prev_hash_for_block,
                         case_id=case_uuid,
                         evidence_item_id=item_id,
-                        state="CHECKEDIN", #New items are always CHECKEDIN
+                        state="CHECKEDIN",
                         creator=creator_str,
-                        owner=default_owner_for_add, #<-- Corrected: Pass a valid owner string
-                        data=b'', #Empty data payload
-                        aes_key=PROJECT_AES_KEY #Use the project key for encryption
+                        owner=default_owner_for_add,
+                        data=b'',
+                        aes_key=PROJECT_AES_KEY
                     )
+                    # Print the evidence_id for this block
+                    print(f"NEW evidence_id for item {item_id}: {new_block.encrypted_evidence_id}")
                 except (ValueError, TypeError, RuntimeError) as e:
-                    #This catches errors during Block instantiation (e.g., bad padding/encryption internally)
                     print(f"Internal Error: Failed to create block object for item {item_id}: {e}", file=sys.stderr)
-                    #If we added previous items successfully, but this block failed, we still must exit 1.
                     sys.exit(1)
 
-                #Pack the block into bytes
                 packed_block_bytes = new_block.pack()
-
-                #Append the packed block to the file
                 f.write(packed_block_bytes)
-                #It's generally good practice to flush after writing important data in append mode
-                #in case of crashes, but for this project appending might buffer.
-                #f.flush() #Optional: uncomment to ensure write happens immediately
-
-                #--- Update previous_hash for the *next* block to be added ---
-                #Calculate the hash of the block we just wrote.
                 last_hash_for_new_block = hashlib.sha256(packed_block_bytes).digest()
+                block_count += 1 
 
-                #--- Print Success Output ---
-                #The example shows the decrypted item ID (which is the original integer).
-                #We use the original item_id_int.
-                #We use the ISO timestamp from the new_block object.
-                print(f"> Added item: {item_id}")
-                print(f"> Status: CHECKEDIN") #Always CHECKEDIN for add command
-                print(f"> Time of action: {new_block.get_timestamp_iso()}")
+                # --- DEBUG: Unpack and print block fields ---
+                unpacked_debug_block = Data_Struct.unpack_block(packed_block_bytes)
+                if unpacked_debug_block:
+                    prev_hash = unpacked_debug_block.get('prev_hash')
+                    timestamp = unpacked_debug_block.get('timestamp')
+                    case_id = unpacked_debug_block.get('encrypted_case_id')
+                    evidence_id = unpacked_debug_block.get('encrypted_evidence_id')
+                    state = unpacked_debug_block.get('state')
+                    creator = unpacked_debug_block.get('creator')
+                    owner = unpacked_debug_block.get('owner')
+                    d_length = unpacked_debug_block.get('d_length')
+                    data = unpacked_debug_block.get('data')
+
+                    print(f"DEBUG (add.py): prev_hash: {prev_hash.hex() if isinstance(prev_hash, bytes) else prev_hash}")
+                    print(f"DEBUG (add.py): timestamp: {timestamp}")
+                    print(f"DEBUG (add.py): case_id: {case_id}" )
+                    print(f"DEBUG (add.py): evidence_id: {evidence_id}" )
+                    print(f"DEBUG (add.py): state: {state}")
+                    print(f"DEBUG (add.py): creator: {creator}")
+                    print(f"DEBUG (add.py): owner: {owner}")
+                    print(f"DEBUG (add.py): d_length: {d_length}")
+                    print(f"DEBUG (add.py): data (hex): {data.hex() if isinstance(data, bytes) else data}")
+                else:
+                    print("DEBUG (add.py): Failed to unpack block just written.")
+                print(f"DEBUG: Just wrote block with evidence_id: {new_block.encrypted_evidence_id}")
 
     except IOError as e:
         #Catch errors during file writing

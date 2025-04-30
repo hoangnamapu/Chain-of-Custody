@@ -8,6 +8,7 @@ import uuid
 import struct
 import time
 from datetime import datetime, timezone
+import binascii  # Add this near the top with other imports
 
 STATE_CHECKEDIN = b'CHECKEDIN\x00\x00\x00'
 STATE_DISPOSED = b'DISPOSED\x00\x00\x00'
@@ -87,8 +88,33 @@ def decrypt_aes_ecb(key: bytes, ciphertext: bytes) -> bytes:
         raise ValueError(f"Decryption failed, likely invalid key or ciphertext: {e}") from e
     return plaintext
 
+def decrypt_aes_ecb_raw(key: bytes, ciphertext: bytes) -> bytes:
+    """Decrypts AES ECB ciphertext WITHOUT unpadding. Requires full blocks."""
+    if len(key) not in [16, 24, 32]:
+        raise ValueError("AES key must be 16, 24, or 32 bytes long")
+    # ECB decryption still requires input length to be a multiple of block size
+    if not ciphertext or len(ciphertext) % AES_BLOCK_SIZE_BYTES != 0:
+        raise ValueError("Ciphertext for raw decryption must be non-empty and a multiple of the AES block size")
+
+    cipher = Cipher(algorithms.AES(key), modes.ECB(), backend=default_backend())
+    decryptor = cipher.decryptor()
+    try:
+        plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+        return plaintext
+    except Exception as e:
+        # Catch potential errors during raw decryption
+        raise ValueError(f"Raw decryption failed: {e}") from e
+
 def funny_number():
     return 69
+
+def make_encrypted_evidence_id(item_id: int, aes_key: bytes = PROJECT_AES_KEY) -> bytes:
+    # Match the Block class: 16-byte big-endian, encrypt, hex, ascii
+    raw_evidence_id_bytes = item_id.to_bytes(16, 'big')
+    encrypted_evidence_id = encrypt_aes_ecb(aes_key, raw_evidence_id_bytes)[:16]
+    evidence_id_hex_string = encrypted_evidence_id.hex()
+    evidence_id_hex_bytes = evidence_id_hex_string.encode('ascii')
+    return evidence_id_hex_bytes
 
 #--- Genesis Block Creation ---
 
@@ -203,35 +229,29 @@ class Block:
         self.timestamp_float = datetime.now(timezone.utc).timestamp()
         self.timestamp_iso = datetime.fromtimestamp(self.timestamp_float, timezone.utc).isoformat()
 
-        # Store the raw 16 UUID bytes, padded to 32 bytes (no encryption for case_id)
-        raw_uuid_bytes = case_id.bytes # e.g., b'\xc8N3\x9e\\\x0fOM\x84\xc5\xbby\xa3\xc1\xd2\xa2'
 
-        # Time to encrypt
-        encrypted_uuid_16 = encrypt_aes_ecb(aes_key, raw_uuid_bytes)
+        # --- CASE ID ENCRYPTION (update this section) ---
+        case_id_bytes = case_id.bytes  # 16 bytes
+        encrypted_case_id_16 = encrypt_aes_ecb(aes_key, case_id_bytes)
+        incomplete_encrypted_case_id = encrypted_case_id_16.ljust(CASE_ID_SIZE, b'\0')
+        case_id_hex_string = incomplete_encrypted_case_id.hex()
+        case_id_hex_bytes = case_id_hex_string.encode('ascii')
+        self.encrypted_case_id = case_id_hex_bytes.ljust(CASE_ID_SIZE, b'\0')
 
-        # Encode the hex string into bytes (32 bytes, where each byte is the ASCII value of the hex character)
-        #uuid_hex_bytes = encrypted_uuid_16.encode('ascii') # e.g., b'c84e339e5c0f4f4d84c5bb79a3c1d2a2'
+        # --- EVIDENCE ID ENCRYPTION ---
+        raw_evidence_id_bytes = evidence_item_id.to_bytes(16, 'big')
+        print(f"Raw Evidence ID Bytes: {raw_evidence_id_bytes.hex()}")  # Debug print
+        encrypted_evidence_id = encrypt_aes_ecb(aes_key, raw_evidence_id_bytes)[:16] #tad bit of an hacky workaround.
+        print(f"Encrypted Evidence ID: {encrypted_evidence_id.hex()}")  # Debug print
+        evidence_id_hex_string = encrypted_evidence_id.hex()  # 32 ASCII chars
+        print(f"Evidence ID Hex String: {evidence_id_hex_string}")
+        evidence_id_hex_bytes = evidence_id_hex_string.encode('ascii')  # 32 bytes
+        print(f"Evidence ID Hex Bytes: {evidence_id_hex_bytes.hex()}")
+        self.encrypted_evidence_id = evidence_id_hex_bytes
+        print(f"Encrypted Evidence ID (final): {self.encrypted_evidence_id.hex()}")  # Debug print
 
-        # Pad these encoded hex characters to 32 bytes.
-        # Since uuid_hex_bytes is already 32 bytes, ljust will not add any padding here.
-        incomplete_encrypted_case_id = encrypted_uuid_16.ljust(CASE_ID_SIZE, b'\0')
 
-
-        # raw_uuid_bytes = case_id.bytes # e.g., b'\xc8N3\x9e\\\x0fOM\x84\xc5\xbby\xa3\xc1\xd2\xa2'
-
-        # Get the 32-character hexadecimal string representation
-        uuid_hex_string = incomplete_encrypted_case_id.hex() # e.g., 'c84e339e5c0f4f4d84c5bb79a3c1d2a2'
-
-        # Encode the hex string into bytes (32 bytes, where each byte is the ASCII value of the hex character)
-        uuid_hex_bytes = uuid_hex_string.encode('ascii') # e.g., b'c84e339e5c0f4f4d84c5bb79a3c1d2a2'
-
-        # Pad these encoded hex characters to 32 bytes.
-        # Since uuid_hex_bytes is already 32 bytes, ljust will not add any padding here.
-        self.encrypted_case_id = uuid_hex_bytes.ljust(CASE_ID_SIZE, b'\0')
-
-        evidence_id_bytes_4 = evidence_item_id.to_bytes(4, 'big')
-        encrypted_evidence_id_16 = encrypt_aes_ecb(aes_key, evidence_id_bytes_4)
-        self.encrypted_evidence_id = encrypted_evidence_id_16.ljust(EVIDENCE_ID_SIZE, b'\0')
+        
 
         self.state = state.encode('utf-8').ljust(STATE_SIZE, b'\0')
         self.creator = creator_bytes.ljust(CREATOR_SIZE, b'\0')
@@ -391,4 +411,106 @@ def unpack_block(block_bytes: bytes) -> dict | None:
         return block_dict
     except (struct.error, UnicodeDecodeError, ValueError, OverflowError) as e:
         return None
+
+
+# --- Add the debug function here ---
+
+def debug_reverse_evidence_id(field_bytes: bytes, key: bytes = PROJECT_AES_KEY):
+    """
+    Attempts to reverse the evidence ID storage process step-by-step for debugging.
+    Takes the 32-byte field as read from the file.
+    """
+    print("\n--- DEBUG REVERSE EVIDENCE ID ---")
+    if not isinstance(field_bytes, bytes) or len(field_bytes) != EVIDENCE_ID_SIZE:
+        print(f"ERROR: Input is not 32 bytes. Got {len(field_bytes)} bytes: {field_bytes!r}")
+        print("--- END DEBUG ---")
+        return
+
+    print(f"1. Input Bytes (32): {field_bytes!r}") # Use !r for unambiguous representation
+
+    # Step 2: Strip trailing null bytes
+    try:
+        stripped_bytes = field_bytes.rstrip(b'\0')
+        print(f"2. Stripped Nulls: {stripped_bytes!r}")
+    except Exception as e:
+        print(f"2. ERROR stripping nulls: {e}")
+        print("--- END DEBUG ---")
+        return
+
+    # Step 3: Decode ASCII
+    hex_string = None
+    try:
+        hex_string = stripped_bytes.decode('ascii')
+        print(f"3. Decoded ASCII (Hex String): '{hex_string}'")
+    except UnicodeDecodeError as e:
+        print(f"3. ERROR decoding ASCII: {e}")
+        print(f"   Problematic bytes (context): {stripped_bytes[e.start-2:e.end+2]!r}")
+        print("--- END DEBUG ---")
+        return
+    except Exception as e:
+        print(f"3. UNEXPECTED ERROR decoding ASCII: {e}")
+        print("--- END DEBUG ---")
+        return
+
+    # Step 4: Convert Hex String to Ciphertext Bytes
+    ciphertext_bytes = None
+    try:
+        if len(hex_string) % 2 != 0:
+            print(f"   WARNING: Hex string has odd length ({len(hex_string)}), padding with '0' for fromhex.")
+            raise ValueError(f"Hex string has odd length ({len(hex_string)}), likely due to truncation during storage.")
+
+        ciphertext_bytes = binascii.unhexlify(hex_string)
+        print(f"4. Converted from Hex (Ciphertext?): {ciphertext_bytes.hex()} ({len(ciphertext_bytes)} bytes)")
+    except (binascii.Error, ValueError) as e:
+        print(f"4. ERROR converting from hex: {e}")
+        print("--- END DEBUG ---")
+        return
+    except Exception as e:
+        print(f"4. UNEXPECTED ERROR converting from hex: {e}")
+        print("--- END DEBUG ---")
+        return
+
+    # Step 5: Decrypt Bytes
+    decrypted_bytes = None
+    try:
+        if len(ciphertext_bytes) % AES_BLOCK_SIZE_BYTES != 0:
+             raise ValueError(f"Ciphertext length ({len(ciphertext_bytes)}) is not a multiple of AES block size ({AES_BLOCK_SIZE_BYTES}). Cannot decrypt.")
+
+        decrypted_bytes = decrypt_aes_ecb(key, ciphertext_bytes)
+        print(f"5. Decrypted (Standard): {decrypted_bytes!r}")
+    except ValueError as e:
+        print(f"5. ERROR decrypting (Standard): {e}")
+        try:
+            if len(ciphertext_bytes) % AES_BLOCK_SIZE_BYTES == 0:
+                decrypted_raw = decrypt_aes_ecb_raw(key, ciphertext_bytes)
+                print(f"   Attempted Raw Decryption: {decrypted_raw!r}")
+            else:
+                print("   Cannot attempt raw decryption: length not multiple of block size.")
+        except Exception as raw_e:
+            print(f"   Raw decryption also failed: {raw_e}")
+    except Exception as e:
+        print(f"5. UNEXPECTED ERROR decrypting: {e}")
+
+    # Step 6: Extract First 4 Bytes (if decryption produced *anything*)
+    original_4_bytes = None
+    if decrypted_bytes is not None and len(decrypted_bytes) >= 4:
+        original_4_bytes = decrypted_bytes[:4]
+        print(f"6. Extracted First 4 Bytes: {original_4_bytes!r}")
+    elif decrypted_bytes is not None:
+        print(f"6. ERROR: Decrypted data too short ({len(decrypted_bytes)} bytes) to extract 4 bytes.")
+    else:
+        print("6. SKIPPED: Decryption failed or produced no result.")
+
+    # Step 7: Convert to Integer (if 4 bytes were extracted)
+    final_int = None
+    if original_4_bytes is not None:
+        try:
+            final_int = int.from_bytes(original_4_bytes, 'big')
+            print(f"7. Converted to Integer: {final_int}")
+        except Exception as e:
+            print(f"7. ERROR converting bytes to int: {e}")
+    else:
+        print("7. SKIPPED: Could not extract 4 bytes.")
+
+    print("--- END DEBUG ---")
 

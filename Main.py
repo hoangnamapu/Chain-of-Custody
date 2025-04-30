@@ -69,11 +69,33 @@ def handle_add(args):
 
 def handle_checkout(args):
     print(f"Executing: checkout (Item: {args.i})")
-    #TODO: Implement checkout logic
+    
+    try:
+        checkout.handle_checkout(args)
+        # If handle_checkout was successful, it already exited with 0.
+        # If it failed, it already exited with 1.
+        # This point should ideally not be reached. If it is, something is wrong in checkout.py
+        print("Internal Warning: checkout.handle_checkout completed without exiting.", file=sys.stderr)
+        sys.exit(1) # Exit with error if the checkout function didn't exit itself.
+    except Exception as e:
+        # Catch any unexpected errors that might occur
+        print(f"An unexpected error occurred while running the checkout command: {e}", file=sys.stderr)
+        sys.exit(1)
 
 def handle_checkin(args):
     print(f"Executing: checkin (Item: {args.i})")
-    #TODO: Implement checkin logic
+    
+    try:
+        checkin.handle_checkin(args)
+        # If handle_checkin was successful, it already exited with 0.
+        # If it failed, it already exited with 1.
+        # This point should ideally not be reached. If it is, something is wrong in checkin.py
+        print("Internal Warning: checkin.handle_checkin completed without exiting.", file=sys.stderr)
+        sys.exit(1) # Exit with error if the checkin function didn't exit itself.
+    except Exception as e:
+        # Catch any unexpected errors that might occur
+        print(f"An unexpected error occurred while running the checkin command: {e}", file=sys.stderr)
+        sys.exit(1)
 
 def handle_show_cases(args):
     print(f"Executing: show cases")
@@ -92,16 +114,50 @@ def handle_show_cases(args):
 
 def handle_show_items(args):
     print(f"Executing: show items (Case: {args.c})")
-    #TODO: Implement show items logic
+    
+    try:
+        show_items.handle_show_items(args)
+        # If handle_show_items was successful, it already exited with 0.
+        # If it failed, it already exited with 1.
+        # This point should ideally not be reached. If it is, something is wrong in show_items.py
+        print("Internal Warning: show_items.handle_show_items completed without exiting.", file=sys.stderr)
+        sys.exit(1) # Exit with error if the show_items function didn't exit itself.
+    except Exception as e:
+        # Catch any unexpected errors that might occur
+        print(f"An unexpected error occurred while running the show items command: {e}", file=sys.stderr)
+        sys.exit(1)
 
 def handle_show_history(args):
     print(f"Executing: show history (Case: {args.c}, Item: {args.i}, Num: {args.n}, Reverse: {args.reverse})")
-    #TODO: Implement show history logic
+    
+    try:
+        show_history.handle_show_history(args)
+        # If handle_show_history was successful, it already exited with 0.
+        # If it failed, it already exited with 1.
+        # This point should ideally not be reached. If it is, something is wrong in show_history.py
+        print("Internal Warning: show_history.handle_show_history completed without exiting.", file=sys.stderr)
+        sys.exit(1) # Exit with error if the show_history function didn't exit itself.
+    except Exception as e:
+        # Catch any unexpected errors that might occur
+        print(f"An unexpected error occurred while running the show history command: {e}", file=sys.stderr)
+        sys.exit(1)
 
 def handle_remove(args):
-    print(f"Executing: remove (Item: {args.i}, Reason: {args.why}, Owner: {args.o})")
-    #TODO: Implement remove logic
-    remove.handle_remove(args)
+
+    print(f"Executing: remove (Item: {args.i}, Reason: {args.why}, Owner: {args.owner})")
+    
+    try:
+        remove.handle_remove(args)
+        # If handle_remove was successful, it already exited with 0.
+        # If it failed, it already exited with 1.
+        # This point should ideally not be reached. If it is, something is wrong in remove.py
+        print("Internal Warning: remove.handle_remove completed without exiting.", file=sys.stderr)
+        sys.exit(1) # Exit with error if the remove function didn't exit itself.
+    except Exception as e:
+        # Catch any unexpected errors that might occur
+        print(f"An unexpected error occurred while running the remove command: {e}", file=sys.stderr)
+        sys.exit(1)
+
 
 def handle_verify(args):
     print(f"Executing: verify")
@@ -114,7 +170,18 @@ def handle_verify(args):
 
 def handle_summary(args):
     print(f"Executing: summary (Case: {args.c})")
-    #TODO: Implement summary logic
+    
+    try:
+        Summary.handle_summary(args)
+        # If handle_summary was successful, it already exited with 0.
+        # If it failed, it already exited with 1.
+        # This point should ideally not be reached. If it is, something is wrong in Summary.py
+        print("Internal Warning: Summary.handle_summary completed without exiting.", file=sys.stderr)
+        sys.exit(1) # Exit with error if the summary function didn't exit itself.
+    except Exception as e:
+        # Catch any unexpected errors that might occur
+        print(f"An unexpected error occurred while running the summary command: {e}", file=sys.stderr)
+        sys.exit(1)
 
 #Main starts here -----------------------------------------------------------------------
 
@@ -133,7 +200,7 @@ def main():
     #add 
     parser_add = subparsers.add_parser('add', help='Add a new evidence item')
     parser_add.add_argument('-c', type=str, required=True, help='Case ID (UUID format)')
-    parser_add.add_argument('-i', type=str, required=True, nargs='+', help='Item ID(s)')
+    parser_add.add_argument('-i', type=str, required=True, action='append', help='Item ID(s)')
     parser_add.add_argument('-g', type=str, required=True, help='Creator name')
     parser_add.add_argument('-p', type=str, required=True, help="Password")
     parser_add.set_defaults(func=handle_add)
@@ -217,4 +284,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
