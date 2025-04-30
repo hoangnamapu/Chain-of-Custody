@@ -84,13 +84,11 @@ def handle_show_cases(args):
                 if block_data and block_data['state_str'] != "INITIAL":
                     encrypted_case_id_padded = block_data['encrypted_case_id']
                     try:
-                        decrypted_case_id_bytes = decrypt_aes_ecb(
-                            PROJECT_AES_KEY,
-                            encrypted_case_id_padded
-                        )
-                        if len(decrypted_case_id_bytes) != 16:
-                            raise ValueError("Decrypted bytes length is not 16, cannot form UUID")
-                        case_uuid = uuid.UUID(bytes=decrypted_case_id_bytes)
+                        # Case IDs are not encrypted, just the first 16 bytes of the padded field
+                        uuid_bytes = encrypted_case_id_padded[:16]
+                        if len(uuid_bytes) != 16:
+                            raise ValueError("UUID bytes length is not 16, cannot form UUID")
+                        case_uuid = uuid.UUID(bytes=uuid_bytes)
                         unique_case_ids.add(case_uuid)
                     except (ValueError, TypeError):
                         pass
