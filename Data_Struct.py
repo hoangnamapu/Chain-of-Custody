@@ -10,6 +10,11 @@ import time
 from datetime import datetime, timezone
 import binascii  # Add this near the top with other imports
 
+STATE_CHECKEDIN = b'CHECKEDIN\x00\x00\x00'
+STATE_DISPOSED = b'DISPOSED\x00\x00\x00'
+STATE_DESTROYED = b'DESTROYED\x00\x00'
+STATE_RELEASED = b'RELEASED\x00\x00\x00'
+
 #--- Required External Library ---
 #Needs: pip install cryptography OR apt install python3-cryptography, at least with what google says. It works on Michael's machine, should work. Remind him with
 #A new requirements.txt if others need to install what he has.
@@ -224,6 +229,7 @@ class Block:
         self.timestamp_float = datetime.now(timezone.utc).timestamp()
         self.timestamp_iso = datetime.fromtimestamp(self.timestamp_float, timezone.utc).isoformat()
 
+
         # --- CASE ID ENCRYPTION (update this section) ---
         case_id_bytes = case_id.bytes  # 16 bytes
         encrypted_case_id_16 = encrypt_aes_ecb(aes_key, case_id_bytes)
@@ -243,6 +249,7 @@ class Block:
         print(f"Evidence ID Hex Bytes: {evidence_id_hex_bytes.hex()}")
         self.encrypted_evidence_id = evidence_id_hex_bytes
         print(f"Encrypted Evidence ID (final): {self.encrypted_evidence_id.hex()}")  # Debug print
+
 
         
 
@@ -404,6 +411,7 @@ def unpack_block(block_bytes: bytes) -> dict | None:
         return block_dict
     except (struct.error, UnicodeDecodeError, ValueError, OverflowError) as e:
         return None
+
 
 # --- Add the debug function here ---
 

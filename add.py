@@ -13,7 +13,7 @@ try:
         PROJECT_AES_KEY, encrypt_aes_ecb, decrypt_aes_ecb, unpack_block,
         BLOCK_HEADER_SIZE, AES_BLOCK_SIZE_BYTES,
         STATE_SIZE, CREATOR_SIZE, OWNER_SIZE, PREV_HASH_SIZE, EVIDENCE_ID_SIZE, #Needed for padding/handling raw bytes
-        BLOCK_HEADER_FORMAT,
+        BLOCK_HEADER_FORMAT
         make_encrypted_evidence_id,
         debug_reverse_evidence_id # Ensure this is imported if used below
     )
@@ -140,6 +140,7 @@ def get_all_item_ids(filepath: str) -> set[int]:
             file_size = os.path.getsize(filepath)
             current_pos = 0
             while current_pos < file_size:
+
                 f.seek(current_pos)
                 header_bytes = f.read(BLOCK_HEADER_SIZE)
                 if len(header_bytes) < BLOCK_HEADER_SIZE:
@@ -148,6 +149,7 @@ def get_all_item_ids(filepath: str) -> set[int]:
                 declared_data_len = unpacked_header[7]
                 block_size = BLOCK_HEADER_SIZE + declared_data_len
                 encrypted_evidence_id_ascii_padded = unpacked_header[3]  # 32 bytes ASCII field
+
 
                 # Skip genesis block
                 if encrypted_evidence_id_ascii_padded == b'0' * EVIDENCE_ID_SIZE:

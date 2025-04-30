@@ -143,6 +143,7 @@ def handle_show_history(args):
         sys.exit(1)
 
 def handle_remove(args):
+
     print(f"Executing: remove (Item: {args.i}, Reason: {args.why}, Owner: {args.owner})")
     
     try:
@@ -156,6 +157,7 @@ def handle_remove(args):
         # Catch any unexpected errors that might occur
         print(f"An unexpected error occurred while running the remove command: {e}", file=sys.stderr)
         sys.exit(1)
+
 
 def handle_verify(args):
     print(f"Executing: verify")
@@ -250,7 +252,7 @@ def main():
     parser_remove.add_argument('-p', type=str, required=True, help="Password (creator's)")
     parser_remove.set_defaults(func=handle_remove)
 
-    #verify 
+        #verify 
     parser_verify = subparsers.add_parser('verify', help='Verify blockchain integrity')
     parser_verify.set_defaults(func=handle_verify)
 
