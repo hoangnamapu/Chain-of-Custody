@@ -198,35 +198,21 @@ class Block:
         self.timestamp_float = datetime.now(timezone.utc).timestamp()
         self.timestamp_iso = datetime.fromtimestamp(self.timestamp_float, timezone.utc).isoformat()
 
-        # Store the raw 16 UUID bytes, padded to 32 bytes (no encryption for case_id)
-        raw_uuid_bytes = case_id.bytes # e.g., b'\xc8N3\x9e\\\x0fOM\x84\xc5\xbby\xa3\xc1\xd2\xa2'
+                # --- CASE ID ENCRYPTION (update this section) ---
+        case_id_bytes = case_id.bytes  # 16 bytes
+        encrypted_case_id_16 = encrypt_aes_ecb(aes_key, case_id_bytes)
+        incomplete_encrypted_case_id = encrypted_case_id_16.ljust(CASE_ID_SIZE, b'\0')
+        case_id_hex_string = incomplete_encrypted_case_id.hex()
+        case_id_hex_bytes = case_id_hex_string.encode('ascii')
+        self.encrypted_case_id = case_id_hex_bytes.ljust(CASE_ID_SIZE, b'\0')
 
-        # Time to encrypt
-        encrypted_uuid_16 = encrypt_aes_ecb(aes_key, raw_uuid_bytes)
-
-        # Encode the hex string into bytes (32 bytes, where each byte is the ASCII value of the hex character)
-        #uuid_hex_bytes = encrypted_uuid_16.encode('ascii') # e.g., b'c84e339e5c0f4f4d84c5bb79a3c1d2a2'
-
-        # Pad these encoded hex characters to 32 bytes.
-        # Since uuid_hex_bytes is already 32 bytes, ljust will not add any padding here.
-        incomplete_encrypted_case_id = encrypted_uuid_16.ljust(CASE_ID_SIZE, b'\0')
-
-
-        # raw_uuid_bytes = case_id.bytes # e.g., b'\xc8N3\x9e\\\x0fOM\x84\xc5\xbby\xa3\xc1\xd2\xa2'
-
-        # Get the 32-character hexadecimal string representation
-        uuid_hex_string = incomplete_encrypted_case_id.hex() # e.g., 'c84e339e5c0f4f4d84c5bb79a3c1d2a2'
-
-        # Encode the hex string into bytes (32 bytes, where each byte is the ASCII value of the hex character)
-        uuid_hex_bytes = uuid_hex_string.encode('ascii') # e.g., b'c84e339e5c0f4f4d84c5bb79a3c1d2a2'
-
-        # Pad these encoded hex characters to 32 bytes.
-        # Since uuid_hex_bytes is already 32 bytes, ljust will not add any padding here.
-        self.encrypted_case_id = uuid_hex_bytes.ljust(CASE_ID_SIZE, b'\0')
-
-        evidence_id_bytes_4 = evidence_item_id.to_bytes(4, 'big')
-        encrypted_evidence_id_16 = encrypt_aes_ecb(aes_key, evidence_id_bytes_4)
-        self.encrypted_evidence_id = encrypted_evidence_id_16.ljust(EVIDENCE_ID_SIZE, b'\0')
+        # --- EVIDENCE ID ENCRYPTION (your working fix) ---
+        raw_evidence_id_bytes = evidence_item_id.to_bytes(16, 'big')
+        encrypted_evidence_id_16 = encrypt_aes_ecb(aes_key, raw_evidence_id_bytes)
+        incomplete_encrypted_evidence_id = encrypted_evidence_id_16.ljust(EVIDENCE_ID_SIZE, b'\0')
+        evidence_id_hex_string = incomplete_encrypted_evidence_id.hex()
+        evidence_id_hex_bytes = evidence_id_hex_string.encode('ascii')
+        self.encrypted_evidence_id = evidence_id_hex_bytes.ljust(EVIDENCE_ID_SIZE, b'\0')
 
         self.state = state.encode('utf-8').ljust(STATE_SIZE, b'\0')
         self.creator = creator_bytes.ljust(CREATOR_SIZE, b'\0')
