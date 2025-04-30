@@ -382,4 +382,3 @@ def unpack_block(block_bytes: bytes) -> dict | None:
 
     except (struct.error, UnicodeDecodeError, ValueError, OverflowError) as e:
         return None #Indicate failure to unpack
-
