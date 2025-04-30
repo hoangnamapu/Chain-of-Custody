@@ -14,8 +14,8 @@ def verify():
         print("CRITICAL: BCHOC_FILE_PATH environment variable not set. Cannot verify.", file=sys.stderr)
         sys.exit(1)
     if not os.path.exists(filepath):
-        print("> Blockchain file not found.")
-        print("> Transactions in blockchain: 0")
+        print("Blockchain file not found.")
+        print("Transactions in blockchain: 0")
         print("State of blockchain: CLEAN")
         sys.exit(0)
 
@@ -54,7 +54,7 @@ def verify():
         print(f"An unexpected error occurred during file reading: {e}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"> Transactions in blockchain: {len(blocks_bytes)}")
+    print(f"Transactions in blockchain: {len(blocks_bytes)}")
 
     prev_block_hash_expected = b'\x00' * PREV_HASH_SIZE  # Genesis block
     seen_parent_hashes = set()
@@ -71,16 +71,16 @@ def verify():
         curr_block_data = unpack_block(curr_block_bytes)
         if curr_block_data is None:
             print("ERROR")
-            print(f"> Bad block: {curr_block_hash.hex()}")
-            print(f"> Unpacking failed for this block bytes.", file=sys.stderr)
+            print(f"Bad block: {curr_block_hash.hex()}")
+            print(f"Unpacking failed for this block bytes.", file=sys.stderr)
             print("State of blockchain: ERROR")
             sys.exit(1)
 
         # Rule 1: prev_hash must match
         if curr_block_data['previous_hash'] != prev_block_hash_expected:
             print("ERROR")
-            print(f"> Bad block: {curr_block_hash.hex()}")
-            print("> Parent block: NOT FOUND")
+            print(f"Bad block: {curr_block_hash.hex()}")
+            print("Parent block: NOT FOUND")
             print("State of blockchain: ERROR")
             sys.exit(1)
 
@@ -88,8 +88,8 @@ def verify():
         if curr_block_data['previous_hash'] in seen_parent_hashes:
             if not (i == 0 and curr_block_data['previous_hash'] == b'\x00' * PREV_HASH_SIZE):
                 print("ERROR")
-                print(f"> Bad block: {curr_block_hash.hex()}")
-                print("> Two blocks were found with the same parent.")
+                print(f"Bad block: {curr_block_hash.hex()}")
+                print("Two blocks were found with the same parent.")
                 print("State of blockchain: ERROR")
                 sys.exit(1)
 
@@ -99,24 +99,24 @@ def verify():
         # Rule 3: Data length must match actual payload length
         if not curr_block_data['data_valid']:
             print("ERROR")
-            print(f"> Bad block: {curr_block_hash.hex()}")
-            print("> Block contents do not match block checksum.")
+            print(f"Bad block: {curr_block_hash.hex()}")
+            print("Block contents do not match block checksum.")
             print("State of blockchain: ERROR")
             sys.exit(1)
 
         # Rule 4: State must be one of the allowed values
         if curr_block_data['state_str'] not in valid_states and curr_block_data['state_str'] != "INITIAL":
             print("ERROR")
-            print(f"> Bad block: {curr_block_hash.hex()}")
-            print(f"> Invalid state '{curr_block_data['state_str']}' found.", file=sys.stderr)
+            print(f"Bad block: {curr_block_hash.hex()}")
+            print(f"Invalid state '{curr_block_data['state_str']}' found.", file=sys.stderr)
             print("State of blockchain: ERROR")
             sys.exit(1)
 
         # Rule 5: Timestamp should be non-negative float (sanity check)
         if curr_block_data['timestamp_float'] < 0:
             print("ERROR")
-            print(f"> Bad block: {curr_block_hash.hex()}")
-            print(f"> Invalid negative timestamp ({curr_block_data['timestamp_float']}) found.", file=sys.stderr)
+            print(f"Bad block: {curr_block_hash.hex()}")
+            print(f"Invalid negative timestamp ({curr_block_data['timestamp_float']}) found.", file=sys.stderr)
             print("State of blockchain: ERROR")
             sys.exit(1)
 

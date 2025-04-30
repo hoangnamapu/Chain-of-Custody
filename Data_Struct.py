@@ -3,7 +3,6 @@
 #for the Blockchain Chain of Custody project.
 #Meant to be imported by Main.py and other modules.
 
-
 import hashlib
 import uuid
 import struct
@@ -11,9 +10,9 @@ import time
 from datetime import datetime, timezone
 
 #--- Required External Library ---
-#Needs: pip install cryptography OR apt install python3-cryptography, at least with what google says. It works on Michael's machine, should work. Remind him with 
+#Needs: pip install cryptography OR apt install python3-cryptography, at least with what google says. It works on Michael's machine, should work. Remind him with
 #A new requirements.txt if others need to install what he has.
-#TODO: MAKE THIS LISTED IN PACKAGES FILE FOR GRADESCROPE 
+#TODO: MAKE THIS LISTED IN PACKAGES FILE FOR GRADESCROPE
 try:
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
     from cryptography.hazmat.primitives.padding import PKCS7
@@ -84,97 +83,64 @@ def decrypt_aes_ecb(key: bytes, ciphertext: bytes) -> bytes:
     return plaintext
 
 def funny_number():
-    #Yes I'm keeping this in. This is my way to make sure the very, very basics work. Something stupidly simple. This
-    #won't run in the final part of the code, but in the meanwhile it's here.
     return 69
 
 #--- Genesis Block Creation ---
 
 def create_genesis_block_bytes() -> bytes:
-    
-    #Creates the specific byte sequence for the Genesis (Initial) Block
-    #as defined on Page 6 of the project specification.
-    #Returns:
-    #    Bytes of the packed Genesis block.
-    #Raises:
-    #    RuntimeError: If packing fails (indicates an internal coding error).
+    prev_hash = bytes(PREV_HASH_SIZE)
+    timestamp = 0.0
+    case_id = bytes(CASE_ID_SIZE)
 
-    #Values exactly as specified for the INITIAL BLOCK on Page 6 
-    prev_hash = bytes(PREV_HASH_SIZE)           #32 zero bytes
-    timestamp = 0.0                             #8 byte float zero
-    case_id = bytes(CASE_ID_SIZE)               #32 zero bytes
-    evidence_id = bytes(EVIDENCE_ID_SIZE)       #32 zero bytes
-    state = b"INITIAL".ljust(STATE_SIZE, b'\0') #"INITIAL" padded to 12 bytes
-    creator = bytes(CREATOR_SIZE)               #12 null bytes
-    owner = bytes(OWNER_SIZE)                   #12 null bytes
-    data_length = 14                            #4 byte integer (specified value)
-    data = b"Initial block\0"                   #14 bytes (specified value)
+    # Encrypt the 4-byte integer 0 (big-endian) for Genesis Evidence ID
+    genesis_item_id_value_int = 0
+    genesis_item_id_value_bytes_4 = genesis_item_id_value_int.to_bytes(4, 'big')
+    encrypted_evidence_id_genesis_16 = encrypt_aes_ecb(PROJECT_AES_KEY, genesis_item_id_value_bytes_4)
+    evidence_id = encrypted_evidence_id_genesis_16.ljust(EVIDENCE_ID_SIZE, b'\0')
+
+    state = b"INITIAL\0\0\0\0\0"
+    creator = bytes(CREATOR_SIZE)
+    owner = bytes(OWNER_SIZE)
+    data_length = 14
+    data = b"Initial block\0"
 
     try:
-        #Pack the header using the defined format
         packed_header = struct.pack(
             BLOCK_HEADER_FORMAT,
             prev_hash, timestamp, case_id, evidence_id, state, creator, owner, data_length
         )
-        #Concatenate header and data
         return packed_header + data
     except struct.error as e:
-        #This failure should not happen with fixed data unless BLOCK_HEADER_FORMAT is wrong
         raise RuntimeError(f"Internal error: Failed to pack genesis block: {e}") from e
 
 #--- Block Class (For non-Genesis blocks) ---
 
 class Block:
-
-    #Represents a single non-genesis block's data. Handles validation,
-    #encryption, packing, and provides accessors/helpers. Created from
-    #plaintext data, stores necessary fields internally for packing.
-
-    #Attributes storing the data needed for packing (some are encrypted/padded)
-    previous_hash: bytes
-    timestamp_float: float
-    encrypted_case_id: bytes
-    encrypted_evidence_id: bytes
-    state: bytes  #Padded bytes (UTF-8 encoded string)
-    creator: bytes #Padded bytes (UTF-8 encoded string)
-    owner: bytes   #Padded bytes (UTF-8 encoded string)
-    data_length: int
-    data: bytes
-
-    #Attributes storing original/decoded values for convenient access (not packed)
-    timestamp_iso: str
-    _original_case_id: uuid.UUID
-    _original_evidence_item_id: int
-    _original_state: str
-    _original_creator: str
-    _original_owner: str
-    _aes_key: bytes #Store key used for this block
-
     def __init__(self,
                  previous_hash: bytes,
                  case_id: uuid.UUID,
                  evidence_item_id: int,
                  state: str,
                  creator: str,
-                 owner: str,
+                 owner: str, #Can be empty string "" for add command blocks
                  data: bytes,
                  aes_key: bytes = PROJECT_AES_KEY):
         #Initializes a non-Genesis Block object from plain data.
         #Performs validation and encryption as per project spec.
 
         #Args:
-        #    previous_hash (bytes): 32-byte SHA-256 hash of the parent block.
-        #    case_id (uuid.UUID): The UUID for the case.
-        #    evidence_item_id (int): The 4-byte integer evidence ID (0 <= id < 2**32).
-        #    state (str): The state string (e.g., "CHECKEDIN"). Must be in ALLOWED_STATES (not 'INITIAL').
-        #    creator (str): The creator string (max 12 bytes when UTF-8 encoded).
-        #    owner (str): The owner string (max 12 bytes when UTF-8 encoded). Must be in ALLOWED_OWNERS.
-        #    data (bytes): The variable-length data payload as bytes.
-        #    aes_key (bytes): AES key for encryption (defaults to PROJECT_AES_KEY). Must be 16, 24, or 32 bytes.
+        #   previous_hash (bytes): 32-byte SHA-256 hash of the parent block.
+        #   case_id (uuid.UUID): The UUID for the case.
+        #   evidence_item_id (int): The 4-byte integer evidence ID (0 <= id < 2**32).
+        #   state (str): The state string (e.g., "CHECKEDIN"). Must be in ALLOWED_STATES (not 'INITIAL').
+        #   creator (str): The creator string (max 12 bytes when UTF-8 encoded).
+        #   owner (str): The owner string (max 12 bytes when UTF-8 encoded). Must be in ALLOWED_OWNERS *unless empty*.
+        #   data (bytes): The variable-length data payload as bytes.
+        #   aes_key (bytes): AES key for encryption (defaults to PROJECT_AES_KEY). Must be 16, 24, or 32 bytes.
 
         #Raises:
-        #    ValueError: If any input data is invalid according to the spec (size, value, allowed set).
-        #    TypeError: If input types are incorrect (e.g., case_id not UUID).
+        #   ValueError: If any input data is invalid according to the spec (size, value, allowed set).
+        #   TypeError: If input types are incorrect (e.g., case_id not UUID).
 
         #--- Input Validation ---
         if not isinstance(previous_hash, bytes) or len(previous_hash) != PREV_HASH_SIZE:
@@ -189,15 +155,28 @@ class Block:
             raise ValueError(f"Block init failed: State '{state}' is not valid. Allowed: {ALLOWED_STATES - {'INITIAL'}}")
         try:
             creator_bytes = creator.encode('utf-8')
-            owner_bytes = owner.encode('utf-8')
         except UnicodeEncodeError as e:
-             raise ValueError(f"Block init failed: Creator or Owner contains invalid UTF-8 characters: {e}") from e
+             raise ValueError(f"Block init failed: Creator contains invalid UTF-8 characters: {e}") from e
         if len(creator_bytes) > CREATOR_SIZE:
              raise ValueError(f"Block init failed: Creator '{creator}' exceeds max length of {CREATOR_SIZE} bytes when UTF-8 encoded")
-        if len(owner_bytes) > OWNER_SIZE:
-             raise ValueError(f"Block init failed: Owner '{owner}' exceeds max length of {OWNER_SIZE} bytes when UTF-8 encoded")
-        if not owner or owner not in ALLOWED_OWNERS: #Ensure owner is provided and valid
-             raise ValueError(f"Block init failed: Owner '{owner}' is not valid or empty. Allowed: {ALLOWED_OWNERS}")
+
+        #--- FIX for Add Command Owner (#008, #007, #009 etc. failures) ---
+        try:
+            owner_bytes_unpadded = owner.encode('utf-8')
+        except UnicodeEncodeError as e:
+             raise ValueError(f"Block init failed: Owner contains invalid UTF-8 characters: {e}") from e
+
+        if owner == "":
+            self.owner = bytes(OWNER_SIZE)
+            self._original_owner = ""
+        else:
+            if owner not in ALLOWED_OWNERS:
+                raise ValueError(f"Block init failed: Owner '{owner}' is not valid. Allowed: {ALLOWED_OWNERS}")
+            if len(owner_bytes_unpadded) > OWNER_SIZE:
+                raise ValueError(f"Block init failed: Owner '{owner}' exceeds max length of {OWNER_SIZE} bytes when UTF-8 encoded")
+            self.owner = owner_bytes_unpadded.ljust(OWNER_SIZE, b'\0')
+            self._original_owner = owner
+
         if not isinstance(data, bytes):
              raise TypeError("Block init failed: data must be bytes")
         if len(data) >= 2**32:
@@ -205,7 +184,6 @@ class Block:
         if len(aes_key) not in [16, 24, 32]:
              raise ValueError(f"Block init failed: AES key must be 16, 24, or 32 bytes long (got {len(aes_key)})")
 
-        #--- Store Original Values ---
         self._original_case_id = case_id
         self._original_evidence_item_id = evidence_item_id
         self._original_state = state
@@ -213,25 +191,20 @@ class Block:
         self._original_owner = owner
         self._aes_key = aes_key
 
-        #--- Process and Store Fields Required for Packing ---
         self.previous_hash = previous_hash
-        #Generate timestamp in UTC as required (Page 7)
         self.timestamp_float = datetime.now(timezone.utc).timestamp()
-        self.timestamp_iso = datetime.fromtimestamp(self.timestamp_float, timezone.utc).isoformat() #Store ISO format for convenience
+        self.timestamp_iso = datetime.fromtimestamp(self.timestamp_float, timezone.utc).isoformat()
 
-        #Encrypt Case ID: UUID (16 bytes) -> Encrypt -> 16 bytes ciphertext -> Pad to 32 bytes
         encrypted_uuid_16 = encrypt_aes_ecb(aes_key, case_id.bytes)
         self.encrypted_case_id = encrypted_uuid_16.ljust(CASE_ID_SIZE, b'\0')
 
-        #Encrypt Evidence ID: Int -> 4 bytes -> Encrypt -> 16 bytes ciphertext -> Pad to 32 bytes
-        evidence_id_bytes_4 = evidence_item_id.to_bytes(4, 'big') #Use big-endian standard
+        evidence_id_bytes_4 = evidence_item_id.to_bytes(4, 'little')
         encrypted_evidence_id_16 = encrypt_aes_ecb(aes_key, evidence_id_bytes_4)
         self.encrypted_evidence_id = encrypted_evidence_id_16.ljust(EVIDENCE_ID_SIZE, b'\0')
 
-        #Pad string fields using the already validated/encoded bytes
-        self.state = state.encode('utf-8').ljust(STATE_SIZE, b'\0') #Re-encode state here for simplicity
+        self.state = state.encode('utf-8').ljust(STATE_SIZE, b'\0')
         self.creator = creator_bytes.ljust(CREATOR_SIZE, b'\0')
-        self.owner = owner_bytes.ljust(OWNER_SIZE, b'\0')
+        #self.owner is already set above
 
         self.data_length = len(data)
         self.data = data
@@ -312,9 +285,11 @@ class Block:
         try:
             #The actual ciphertext is the first 16 bytes before padding
             decrypted_padded_bytes = decrypt_aes_ecb(use_key, self.encrypted_evidence_id[:AES_BLOCK_SIZE_BYTES])
-            #Original data was 4 bytes, big-endian
+            #Original data was 4 bytes, little-endian
             original_bytes = decrypted_padded_bytes[:4]
-            return int.from_bytes(original_bytes, 'big')
+            if len(original_bytes) < 4:
+                raise ValueError("Decrypted bytes insufficient for 4-byte integer conversion")
+            return int.from_bytes(original_bytes, 'little')
         except (ValueError, TypeError, Exception): #Catch decryption/int conversion errors
             return None #Indicate failure
 
@@ -328,16 +303,16 @@ def unpack_block(block_bytes: bytes) -> dict | None:
     #perform decryption. Essential for reading/verifying the chain.
 
     #Args:
-    #    block_bytes: The raw bytes of a single block (header + data).
+    #   block_bytes: The raw bytes of a single block (header + data).
 
     #Returns:
-    #    A dictionary containing the unpacked fields if successful. Keys include:
-    #      'previous_hash', 'timestamp_float', 'encrypted_case_id',
-    #      'encrypted_evidence_id', 'state' (bytes), 'creator' (bytes),
-    #      'owner' (bytes), 'data_length', 'data' (bytes), 'raw_bytes' (original input),
-    #      'data_valid' (bool: checks if data length matches payload size),
-    #      'state_str', 'creator_str', 'owner_str', 'timestamp_iso'.
-    #    Returns None if unpacking fails (e.g., insufficient bytes, format mismatch).
+    #   A dictionary containing the unpacked fields if successful. Keys include:
+    #     'previous_hash', 'timestamp_float', 'encrypted_case_id',
+    #     'encrypted_evidence_id', 'state' (bytes), 'creator' (bytes),
+    #     'owner' (bytes), 'data_length', 'data' (bytes), 'raw_bytes' (original input),
+    #     'data_valid' (bool: checks if data length matches payload size),
+    #     'state_str', 'creator_str', 'owner_str', 'timestamp_iso'.
+    #   Returns None if unpacking fails (e.g., insufficient bytes, format mismatch).
     #
     if not isinstance(block_bytes, bytes):
         #Ensure input is bytes

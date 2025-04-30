@@ -176,10 +176,10 @@ def get_all_item_ids(filepath: str) -> set[int]:
                          PROJECT_AES_KEY,
                          encrypted_evidence_id_padded[:AES_BLOCK_SIZE_BYTES]
                      )
-                     #Original data was 4 bytes, big-endian. Unpadding may return more than 4 bytes.
+                     #Original data was 4 bytes, little-endian. Unpadding may return more than 4 bytes.
                      #We only care about the first 4 bytes for the integer conversion.
                      original_bytes = decrypted_padded_bytes[:4]
-                     item_id_int = int.from_bytes(original_bytes, 'big')
+                     item_id_int = int.from_bytes(original_bytes, 'little')
                      seen_item_ids.add(item_id_int)
 
                  except (ValueError, TypeError):
