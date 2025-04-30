@@ -295,6 +295,7 @@ def handle_add(args):
             #After creating genesis, the last hash for the *first* item block
             #will be the hash of this newly created genesis block.
             last_hash_for_new_block = hashlib.sha256(genesis_bytes).digest()
+            block_count = 1  # <-- Add this line to fix the error
             #file_exists is now True and file size is > 0
 
         except (IOError, RuntimeError) as e:
@@ -315,57 +316,38 @@ def handle_add(args):
             sys.exit(1)
 
     #--- 6. Add Each Item as a New Block ---
-    #Open the file in append mode. 'ab' ensures we write bytes and append to the end.
-    #We keep it open while adding multiple items for efficiency.
     try:
         with open(blockchain_file_path, 'ab') as f:
-            #Iterate through each validated item ID
             for i, item_id in enumerate(item_ids_int):
-                #--- FIX: Provide a valid default owner string ---
-                #Based on Block.__init__ validation and CHECKEDIN state implication.
-                #The spec doesn't explicitly state the owner for 'add' blocks,
-                #but the Block class requires it to be one of the allowed roles.
-                default_owner_for_add = "Police" #Choose one of the ALLOWED_OWNERS
+                # For the first non-genesis block, set prev_hash=0 (not b'\x00'*32)
+                if block_count == 1 and i == 0:
+                    prev_hash_for_block = 0
+                else:
+                    prev_hash_for_block = last_hash_for_new_block
 
-                #Create the Block instance
-                #state is automatically CHECKEDIN for new additions
-                #data is b'' and data_length is 0 for add command blocks
+                default_owner_for_add = "" # or "" if your Block class allows it
+
                 try:
                     new_block = Block(
-                        previous_hash=last_hash_for_new_block, #Use the hash from the previous block
+                        previous_hash=prev_hash_for_block,
                         case_id=case_uuid,
                         evidence_item_id=item_id,
-                        state="CHECKEDIN", #New items are always CHECKEDIN
+                        state="CHECKEDIN",
                         creator=creator_str,
-                        owner=default_owner_for_add, #<-- Corrected: Pass a valid owner string
-                        data=b'', #Empty data payload
-                        aes_key=PROJECT_AES_KEY #Use the project key for encryption
+                        owner=default_owner_for_add,
+                        data=b'',
+                        aes_key=PROJECT_AES_KEY
                     )
                 except (ValueError, TypeError, RuntimeError) as e:
-                    #This catches errors during Block instantiation (e.g., bad padding/encryption internally)
                     print(f"Internal Error: Failed to create block object for item {item_id}: {e}", file=sys.stderr)
-                    #If we added previous items successfully, but this block failed, we still must exit 1.
                     sys.exit(1)
 
-                #Pack the block into bytes
                 packed_block_bytes = new_block.pack()
-
-                #Append the packed block to the file
                 f.write(packed_block_bytes)
-                #It's generally good practice to flush after writing important data in append mode
-                #in case of crashes, but for this project appending might buffer.
-                #f.flush() #Optional: uncomment to ensure write happens immediately
-
-                #--- Update previous_hash for the *next* block to be added ---
-                #Calculate the hash of the block we just wrote.
                 last_hash_for_new_block = hashlib.sha256(packed_block_bytes).digest()
 
-                #--- Print Success Output ---
-                #The example shows the decrypted item ID (which is the original integer).
-                #We use the original item_id_int.
-                #We use the ISO timestamp from the new_block object.
                 print(f"> Added item: {item_id}")
-                print(f"> Status: CHECKEDIN") #Always CHECKEDIN for add command
+                print(f"> Status: CHECKEDIN")
                 print(f"> Time of action: {new_block.get_timestamp_iso()}")
 
     except IOError as e:

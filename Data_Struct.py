@@ -131,34 +131,24 @@ def create_genesis_block_bytes() -> bytes:
 
 class Block:
     def __init__(self,
-                 previous_hash: bytes,
+                 previous_hash: bytes | int,
                  case_id: uuid.UUID,
                  evidence_item_id: int,
                  state: str,
                  creator: str,
-                 owner: str, #Can be empty string "" for add command blocks
+                 owner: str,
                  data: bytes,
                  aes_key: bytes = PROJECT_AES_KEY):
-        #Initializes a non-Genesis Block object from plain data.
-        #Performs validation and encryption as per project spec.
 
-        #Args:
-        #   previous_hash (bytes): 32-byte SHA-256 hash of the parent block.
-        #   case_id (uuid.UUID): The UUID for the case.
-        #   evidence_item_id (int): The 4-byte integer evidence ID (0 <= id < 2**32).
-        #   state (str): The state string (e.g., "CHECKEDIN"). Must be in ALLOWED_STATES (not 'INITIAL').
-        #   creator (str): The creator string (max 12 bytes when UTF-8 encoded).
-        #   owner (str): The owner string (max 12 bytes when UTF-8 encoded). Must be in ALLOWED_OWNERS *unless empty*.
-        #   data (bytes): The variable-length data payload as bytes.
-        #   aes_key (bytes): AES key for encryption (defaults to PROJECT_AES_KEY). Must be 16, 24, or 32 bytes.
-
-        #Raises:
-        #   ValueError: If any input data is invalid according to the spec (size, value, allowed set).
-        #   TypeError: If input types are incorrect (e.g., case_id not UUID).
+        # Accept integer 0 for prev_hash and store as int, else validate as bytes
+        if previous_hash == 0:
+            self.previous_hash = 0
+        elif isinstance(previous_hash, bytes) and len(previous_hash) == PREV_HASH_SIZE:
+            self.previous_hash = previous_hash
+        else:
+            raise ValueError(f"Block init failed: previous_hash must be {PREV_HASH_SIZE} bytes or integer 0")
 
         #--- Input Validation ---
-        if not isinstance(previous_hash, bytes) or len(previous_hash) != PREV_HASH_SIZE:
-            raise ValueError(f"Block init failed: previous_hash must be {PREV_HASH_SIZE} bytes")
         if not isinstance(case_id, uuid.UUID):
             raise TypeError("Block init failed: case_id must be a uuid.UUID object")
         if not isinstance(evidence_item_id, int) or not (0 <= evidence_item_id < 2**32):
@@ -205,7 +195,6 @@ class Block:
         self._original_owner = owner
         self._aes_key = aes_key
 
-        self.previous_hash = previous_hash
         self.timestamp_float = datetime.now(timezone.utc).timestamp()
         self.timestamp_iso = datetime.fromtimestamp(self.timestamp_float, timezone.utc).isoformat()
 
@@ -224,11 +213,12 @@ class Block:
         self.data = data
 
     def pack(self) -> bytes:
-        #Packs the block's processed data into a single bytes object for storage
         try:
+            # Convert int 0 to 32 null bytes for struct.pack
+            prev_hash_bytes = b'\x00' * PREV_HASH_SIZE if self.previous_hash == 0 else self.previous_hash
             packed_header = struct.pack(
                 BLOCK_HEADER_FORMAT,
-                self.previous_hash,
+                prev_hash_bytes,
                 self.timestamp_float,
                 self.encrypted_case_id,
                 self.encrypted_evidence_id,
@@ -239,7 +229,6 @@ class Block:
             )
             return packed_header + self.data
         except struct.error as e:
-            #This indicates an internal inconsistency between __init__ and pack format.
             raise RuntimeError(f"Internal error: Failed to pack block data: {e}") from e
 
     def calculate_hash(self) -> bytes:
@@ -336,9 +325,11 @@ def unpack_block(block_bytes: bytes) -> dict | None:
         return None
 
     try:
-        #Unpack the fixed-size header
         header_bytes = block_bytes[:BLOCK_HEADER_SIZE]
         unpacked_header = struct.unpack(BLOCK_HEADER_FORMAT, header_bytes)
+        prev_hash_val = unpacked_header[0]
+        # If prev_hash is all null bytes, treat as 0 for display
+        prev_hash_display = 0 if prev_hash_val == b'\x00' * PREV_HASH_SIZE else prev_hash_val
 
         #Extract the variable-length data payload
         data_payload = block_bytes[BLOCK_HEADER_SIZE:]
@@ -360,8 +351,7 @@ def unpack_block(block_bytes: bytes) -> dict | None:
 
         #--- Construct Result Dictionary ---
         block_dict = {
-            #Raw/Packed Fields
-            'previous_hash': unpacked_header[0],
+            'previous_hash': prev_hash_display,
             'timestamp_float': timestamp_val,
             'encrypted_case_id': unpacked_header[2],
             'encrypted_evidence_id': unpacked_header[3],
@@ -379,7 +369,6 @@ def unpack_block(block_bytes: bytes) -> dict | None:
             'timestamp_iso': timestamp_iso,      #ISO 8601 formatted timestamp
         }
         return block_dict
-
     except (struct.error, UnicodeDecodeError, ValueError, OverflowError) as e:
-        return None #Indicate failure to unpack
+        return None
 
