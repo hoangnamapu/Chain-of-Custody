@@ -129,7 +129,18 @@ def handle_show_items(args):
 
 def handle_show_history(args):
     print(f"Executing: show history (Case: {args.c}, Item: {args.i}, Num: {args.n}, Reverse: {args.reverse})")
-    #TODO: Implement show history logic
+    
+    try:
+        show_history.handle_show_history(args)
+        # If handle_show_history was successful, it already exited with 0.
+        # If it failed, it already exited with 1.
+        # This point should ideally not be reached. If it is, something is wrong in show_history.py
+        print("Internal Warning: show_history.handle_show_history completed without exiting.", file=sys.stderr)
+        sys.exit(1) # Exit with error if the show_history function didn't exit itself.
+    except Exception as e:
+        # Catch any unexpected errors that might occur
+        print(f"An unexpected error occurred while running the show history command: {e}", file=sys.stderr)
+        sys.exit(1)
 
 def handle_remove(args):
     print(f"Executing: remove (Item: {args.i}, Reason: {args.why}, Owner: {args.owner})")

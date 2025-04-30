@@ -11,7 +11,8 @@ try:
     from Data_Struct import (
         PROJECT_AES_KEY, encrypt_aes_ecb, decrypt_aes_ecb, unpack_block,
         BLOCK_HEADER_SIZE, AES_BLOCK_SIZE_BYTES,
-        STATE_SIZE, CREATOR_SIZE, OWNER_SIZE, PREV_HASH_SIZE, EVIDENCE_ID_SIZE #Needed for padding/handling raw bytes
+        STATE_SIZE, CREATOR_SIZE, OWNER_SIZE, PREV_HASH_SIZE, EVIDENCE_ID_SIZE, #Needed for padding/handling raw bytes
+        BLOCK_HEADER_FORMAT
     )
     #Import the Block class for creating new block objects
     from Data_Struct import Block #Import the Block class explicitly
@@ -85,7 +86,7 @@ def get_last_block_info(filepath: str) -> tuple[bytes, int]:
                          raise ValueError(f"File truncated or corrupt: Incomplete header at offset {current_pos}")
 
                 try:
-                    unpacked_header = struct.unpack(Data_Struct.BLOCK_HEADER_FORMAT, header_bytes)
+                    unpacked_header = struct.unpack(BLOCK_HEADER_FORMAT, header_bytes)
                     declared_data_len = unpacked_header[7]
                 except struct.error:
                     raise ValueError(f"File corrupt: Cannot unpack header at offset {current_pos}")
@@ -154,7 +155,7 @@ def get_all_item_ids(filepath: str) -> set[int]:
                           sys.exit(1) #Exit on file corruption
 
                  try:
-                     unpacked_header = struct.unpack(Data_Struct.BLOCK_HEADER_FORMAT, header_bytes)
+                     unpacked_header = struct.unpack(BLOCK_HEADER_FORMAT, header_bytes)
                      declared_data_len = unpacked_header[7]
                  except struct.error:
                       print(f"Error reading existing item IDs: Cannot unpack header at offset {current_pos}.", file=sys.stderr)
