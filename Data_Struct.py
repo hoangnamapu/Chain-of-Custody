@@ -199,7 +199,30 @@ class Block:
         self.timestamp_iso = datetime.fromtimestamp(self.timestamp_float, timezone.utc).isoformat()
 
         # Store the raw 16 UUID bytes, padded to 32 bytes (no encryption for case_id)
-        self.encrypted_case_id = case_id.bytes.ljust(CASE_ID_SIZE, b'\0')
+        raw_uuid_bytes = case_id.bytes # e.g., b'\xc8N3\x9e\\\x0fOM\x84\xc5\xbby\xa3\xc1\xd2\xa2'
+
+        # Time to encrypt
+        encrypted_uuid_16 = encrypt_aes_ecb(aes_key, raw_uuid_bytes)
+
+        # Encode the hex string into bytes (32 bytes, where each byte is the ASCII value of the hex character)
+        #uuid_hex_bytes = encrypted_uuid_16.encode('ascii') # e.g., b'c84e339e5c0f4f4d84c5bb79a3c1d2a2'
+
+        # Pad these encoded hex characters to 32 bytes.
+        # Since uuid_hex_bytes is already 32 bytes, ljust will not add any padding here.
+        incomplete_encrypted_case_id = encrypted_uuid_16.ljust(CASE_ID_SIZE, b'\0')
+
+
+        # raw_uuid_bytes = case_id.bytes # e.g., b'\xc8N3\x9e\\\x0fOM\x84\xc5\xbby\xa3\xc1\xd2\xa2'
+
+        # Get the 32-character hexadecimal string representation
+        uuid_hex_string = incomplete_encrypted_case_id.hex() # e.g., 'c84e339e5c0f4f4d84c5bb79a3c1d2a2'
+
+        # Encode the hex string into bytes (32 bytes, where each byte is the ASCII value of the hex character)
+        uuid_hex_bytes = uuid_hex_string.encode('ascii') # e.g., b'c84e339e5c0f4f4d84c5bb79a3c1d2a2'
+
+        # Pad these encoded hex characters to 32 bytes.
+        # Since uuid_hex_bytes is already 32 bytes, ljust will not add any padding here.
+        self.encrypted_case_id = uuid_hex_bytes.ljust(CASE_ID_SIZE, b'\0')
 
         evidence_id_bytes_4 = evidence_item_id.to_bytes(4, 'big')
         encrypted_evidence_id_16 = encrypt_aes_ecb(aes_key, evidence_id_bytes_4)
@@ -346,7 +369,7 @@ def unpack_block(block_bytes: bytes) -> dict | None:
             'previous_hash': prev_hash_display,
             'timestamp_float': timestamp_val,
             'encrypted_case_id': unpacked_header[2],  # This is the raw 16 UUID bytes padded to 32 now
-            'encrypted_evidence_id': unpacked_header[3][:16].hex(),
+            'encrypted_evidence_id': unpacked_header[3],
             'state': unpacked_header[4],         #Raw bytes state field
             'creator': unpacked_header[5],       #Raw bytes creator field
             'owner': unpacked_header[6],         #Raw bytes owner field

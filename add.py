@@ -325,7 +325,9 @@ def handle_add(args):
                 else:
                     prev_hash_for_block = last_hash_for_new_block
 
-                default_owner_for_add = "" # or "" if your Block class allows it
+                default_owner_for_add = "" 
+                
+                #print(f"DEBUG (add.py): Using case ID: {case_uuid}")
 
                 try:
                     new_block = Block(
@@ -341,10 +343,24 @@ def handle_add(args):
                 except (ValueError, TypeError, RuntimeError) as e:
                     print(f"Internal Error: Failed to create block object for item {item_id}: {e}", file=sys.stderr)
                     sys.exit(1)
+                
+                # print(f"DEBUG: Encrypted evidence ID bytes stored for item {item_id}: {new_block.encrypted_evidence_id!r}")
 
                 packed_block_bytes = new_block.pack()
                 f.write(packed_block_bytes)
                 last_hash_for_new_block = hashlib.sha256(packed_block_bytes).digest()
+                
+                unpacked_debug_block = Data_Struct.unpack_block(packed_block_bytes)
+                if unpacked_debug_block:
+                    stored_case_id_bytes = unpacked_debug_block.get('encrypted_case_id')
+                    if isinstance(stored_case_id_bytes, bytes):
+                         # Use .hex() to get the hexadecimal string representation
+                         print(f"DEBUG (add.py): Unpacked case_id bytes (hex): {stored_case_id_bytes}")
+                    else:
+                         # Fallback if unpack_block didn't return bytes for some reason
+                         print(f"DEBUG (add.py): Unpacked case_id is not bytes: {stored_case_id_bytes}")
+                else:
+                    print("DEBUG (add.py): Failed to unpack block just written.")
 
                 print(f"> Added item: {item_id}")
                 print(f"> Status: CHECKEDIN")
