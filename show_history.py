@@ -86,35 +86,30 @@ def get_blockchain_history(filepath, case_id_filter=None, item_id_filter=None):
                 block_data = unpack_block(full_block_bytes)
                 if block_data and block_data['state_str'] != "INITIAL":
                     try:
-                        # Use Data_Struct's function to properly decrypt the case ID
                         encrypted_case_id = block_data['encrypted_case_id']
                         block_case_id = Data_Struct.decrypt_case_id_from_packed(encrypted_case_id)
-                        if block_case_id is not None:
-                            # Use Data_Struct's function to properly decrypt the evidence ID
-                            encrypted_evidence_id = block_data['encrypted_evidence_id']
-                            block_item_id = Data_Struct.decrypt_evidence_id_from_packed(encrypted_evidence_id)
-                            if block_item_id is None:
-                                continue
-                            
-                            # Apply filters
-                            case_match = case_id_filter is None or block_case_id == case_id_filter
-                            item_match = item_id_filter is None or block_item_id == item_id_filter
-                            
-                            if case_match and item_match:
-                                # Create history entry
-                                entry = HistoryEntry(
-                                    case_id=block_case_id,
-                                    item_id=block_item_id,
-                                    action=block_data['state_str'],
-                                    timestamp=block_data['timestamp_iso'],
-                                    position=position,
-                                    owner=block_data['owner_str']
-                                )
-                                history_entries.append(entry)
-                        
+                        encrypted_evidence_id = block_data['encrypted_evidence_id']
+                        block_item_id = Data_Struct.decrypt_evidence_id_from_packed(encrypted_evidence_id)
+
+                        if block_case_id is None or block_item_id is None:
+                            continue  # Skip blocks with failed decryption
+
+                        # Apply filters
+                        case_match = case_id_filter is None or block_case_id == case_id_filter
+                        item_match = item_id_filter is None or block_item_id == item_id_filter
+
+                        if case_match and item_match:
+                            history_entries.append(HistoryEntry(
+                                case_id=block_case_id,
+                                item_id=block_item_id,
+                                action=block_data['state_str'],
+                                timestamp=block_data['timestamp_iso'],
+                                position=position,
+                                owner=block_data['owner_str']
+                            ))
+
                     except Exception:
-                        # Skip this block if decryption fails
-                        pass
+                        continue  # Skip block on any error
                 
                 position += 1
                 current_pos += block_size
@@ -132,70 +127,81 @@ def handle_show_history(args):
     item_id_str = getattr(args, 'i', None)
     num_entries = getattr(args, 'n', None)
     reverse_order = getattr(args, 'reverse', False)
-    
-    # Validate the provided password
+
     if not is_valid_owner_password(provided_password):
         print("> Invalid password", file=sys.stderr)
         sys.exit(1)
-    
-    # Get blockchain file path from environment
-    blockchain_file_path = os.getenv("BCHOC_FILE_PATH")
-    if not blockchain_file_path:
-        print("CRITICAL: BCHOC_FILE_PATH environment variable not set. Cannot show history.", file=sys.stderr)
-        sys.exit(1)
-    
-    # Check if the blockchain file exists
-    if not os.path.exists(blockchain_file_path):
-        print(f"Blockchain file not found. No history to show.")
-        sys.exit(0)
-    
-    # Parse case ID filter if provided
-    case_id_filter = None
-    if case_id_str is not None:
-        try:
-            case_id_filter = uuid.UUID(case_id_str)
-        except ValueError:
-            print(f"Error: Invalid case ID format: '{case_id_str}'. Must be a valid UUID.", file=sys.stderr)
+
+    try:
+        blockchain_file_path = os.getenv("BCHOC_FILE_PATH")
+        if not blockchain_file_path:
+            print("CRITICAL: BCHOC_FILE_PATH environment variable not set. Cannot show history.", file=sys.stderr)
             sys.exit(1)
-    
-    # Parse item ID filter if provided
-    item_id_filter = None
-    if item_id_str is not None:
-        try:
-            item_id_filter = int(item_id_str)
-            if not (0 <= item_id_filter < 2**32):
-                print(f"Error: Item ID '{item_id_str}' is out of the valid range.", file=sys.stderr)
+
+        if not os.path.exists(blockchain_file_path):
+            print(f"Blockchain file not found. No history to show.")
+            sys.exit(0)
+
+        # Parse case ID filter if provided
+        case_id_filter = None
+        if case_id_str is not None:
+            try:
+                case_id_filter = uuid.UUID(case_id_str)
+            except ValueError:
+                print(f"Error: Invalid case ID format: '{case_id_str}'. Must be a valid UUID.", file=sys.stderr)
                 sys.exit(1)
-        except ValueError:
-            print(f"Error: Invalid item ID format: '{item_id_str}'. Must be an integer.", file=sys.stderr)
-            sys.exit(1)
-    
-    # Get blockchain history with applied filters
-    history_entries = get_blockchain_history(
-        blockchain_file_path, 
-        case_id_filter=case_id_filter,
-        item_id_filter=item_id_filter
-    )
-    
-    # Apply reverse order if requested
-    if reverse_order:
-        history_entries.reverse()
-    
-    # Apply limit if requested
-    if num_entries is not None and num_entries > 0:
-        history_entries = history_entries[:num_entries]
-    
-    # Display history entries
-    if history_entries:
-        for i, entry in enumerate(history_entries):
-            if i > 0:
-                print()  # Blank line between entries
-            print(f"Case: {entry.case_id}")
-            print(f"Item: {entry.item_id}")
-            print(f"Action: {entry.action}")
-            print(f"Time: {entry.timestamp}")
-            # Only print owner if it's not empty and there's an action that warrants it
-            if entry.owner and entry.owner.strip() and entry.action in ["CHECKEDOUT", "RELEASED"]:
-                print(f"Owner: {entry.owner}")
-    
-    sys.exit(0)
+
+        # Parse item ID filter if provided
+        item_id_filter = None
+        if item_id_str is not None:
+            try:
+                item_id_filter = int(item_id_str)
+                if not (0 <= item_id_filter < 2**32):
+                    print(f"Error: Item ID '{item_id_str}' is out of the valid range.", file=sys.stderr)
+                    sys.exit(1)
+            except ValueError:
+                print(f"Error: Invalid item ID format: '{item_id_str}'. Must be an integer.", file=sys.stderr)
+                sys.exit(1)
+
+        # Get blockchain history with applied filters
+        history_entries = get_blockchain_history(
+            blockchain_file_path,
+            case_id_filter=case_id_filter,
+            item_id_filter=item_id_filter
+        )
+
+        # Apply reverse order if requested
+        if reverse_order:
+            history_entries.reverse()
+
+        # Apply limit if requested
+        if num_entries is not None and num_entries >= 0:  # Allow n=0
+            history_entries = history_entries[:num_entries]
+        elif num_entries is not None and num_entries < 0:
+            print("Warning: Invalid negative value for -n. Showing all entries.", file=sys.stderr)
+
+        # Display history entries
+        if history_entries:  # Only enter this block if the list is NOT empty
+            print(f"Executing: show history (Case: {getattr(args, 'c', None)}, Item: {getattr(args, 'i', None)}, Num: {getattr(args, 'n', None)}, Reverse: {getattr(args, 'reverse', False)})")
+            first_entry = True
+            for i, entry in enumerate(history_entries):
+                if not first_entry:
+                    print()  # Print blank line between entries
+                print(f"> Case: {entry.case_id}")
+                print(f"> Item: {entry.item_id}")
+                print(f"> Action: {entry.action}")
+                print(f"> Time: {entry.timestamp}")
+                owner_cleaned = entry.owner.strip('\x00') if entry.owner else ''
+                if owner_cleaned and entry.action in ["CHECKEDOUT", "RELEASED"]:
+                    print(f"> Owner: {owner_cleaned}")
+                first_entry = False
+
+        # If history_entries is empty, the 'if' block is skipped, and nothing is printed.
+
+        sys.exit(0)  # Exit successfully regardless
+
+    except Exception as e:
+        print(f"An unexpected error occurred while running the show history command: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        sys.exit(1)

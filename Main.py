@@ -50,7 +50,7 @@ def handle_init(args):
         sys.exit(1)
 
 def handle_add(args):
-    print(f"Executing: add (Case: {args.c}, Items: {args.i}, Creator: {args.g})")
+    # print(f"Executing: add (Case: {args.c}, Items: {args.i}, Creator: {args.g})")
     
     try:
         add.handle_add(args)
@@ -68,7 +68,7 @@ def handle_add(args):
     #TODO: Implement add logic
 
 def handle_checkout(args):
-    print(f"Executing: checkout (Item: {args.i})")
+    # print(f"Executing: checkout (Item: {args.i})")
     
     try:
         checkout.handle_checkout(args)
@@ -83,7 +83,7 @@ def handle_checkout(args):
         sys.exit(1)
 
 def handle_checkin(args):
-    print(f"Executing: checkin (Item: {args.i})")
+    # print(f"Executing: checkin (Item: {args.i})")
     
     try:
         checkin.handle_checkin(args)
@@ -98,7 +98,7 @@ def handle_checkin(args):
         sys.exit(1)
 
 def handle_show_cases(args):
-    print(f"Executing: show cases")
+    # print(f"Executing: show cases")
     try:
         show_cases.handle_show_cases(args)
         #If show_cases.handle_show_cases was successful, it already exited with 0.
@@ -113,7 +113,7 @@ def handle_show_cases(args):
     #TODO: Implement show cases logic
 
 def handle_show_items(args):
-    print(f"Executing: show items (Case: {args.c})")
+    # print(f"Executing: show items (Case: {args.c})")
     
     try:
         show_items.handle_show_items(args)
@@ -128,7 +128,7 @@ def handle_show_items(args):
         sys.exit(1)
 
 def handle_show_history(args):
-    print(f"Executing: show history (Case: {args.c}, Item: {args.i}, Num: {args.n}, Reverse: {args.reverse})")
+    # print(f"Executing: show history (Case: {args.c}, Item: {args.i}, Num: {args.n}, Reverse: {args.reverse})")
     
     try:
         show_history.handle_show_history(args)
@@ -143,7 +143,7 @@ def handle_show_history(args):
         sys.exit(1)
 
 def handle_remove(args):
-    print(f"Executing: remove (Item: {args.i}, Reason: {args.why}, Owner: {args.owner})")
+    # print(f"Executing: remove (Item: {args.i}, Reason: {args.why}, Owner: {args.owner})")
     
     try:
         remove.handle_remove(args)
@@ -158,7 +158,7 @@ def handle_remove(args):
         sys.exit(1)
 
 def handle_verify(args):
-    print(f"Executing: verify")
+    # print(f"Executing: verify")
     #TODO: Implement verify logic
     try:
         verify.verify()    
@@ -167,7 +167,7 @@ def handle_verify(args):
         sys.exit(1)
 
 def handle_summary(args):
-    print(f"Executing: summary (Case: {args.c})")
+    # print(f"Executing: summary (Case: {args.c})")
     
     try:
         Summary.handle_summary(args)

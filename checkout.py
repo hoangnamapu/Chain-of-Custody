@@ -43,10 +43,8 @@ def get_last_block_and_item_state(filepath, item_id_int):
 
     try:
         if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
-            print(f"DEBUG CHECKOUT (get_last_block_...): File '{filepath}' not found or empty.", file=sys.stderr)
             return last_block_hash, current_state, case_id, creator, item_exists, block_count
 
-        print(f"DEBUG CHECKOUT (get_last_block_...): Starting scan of '{filepath}' for item {item_id_int}", file=sys.stderr)
         with open(filepath, 'rb') as f:
             file_size = os.path.getsize(filepath)
             current_pos = 0
@@ -61,7 +59,6 @@ def get_last_block_and_item_state(filepath, item_id_int):
                 declared_data_len = unpacked_header[7]
                 block_size = BLOCK_HEADER_SIZE + declared_data_len
                 if current_pos + block_size > file_size:
-                    print(f"ERROR CHECKOUT: Block size {block_size} exceeds file size from offset {current_pos}.", file=sys.stderr)
                     break
 
                 # Read the full block
@@ -70,8 +67,6 @@ def get_last_block_and_item_state(filepath, item_id_int):
 
                 # Hash this block for the *next* block's prev_hash field
                 block_hash = hashlib.sha256(full_block_bytes).digest()
-                # +++ DEBUG PRINT +++
-                print(f"DEBUG CHECKOUT (get_last_block_...): Calculated hash for block at offset {block_start_offset}: {block_hash.hex()}", file=sys.stderr)
 
                 # Unpack block data
                 block_data = unpack_block(full_block_bytes)
@@ -95,8 +90,6 @@ def get_last_block_and_item_state(filepath, item_id_int):
         print(f"Error reading blockchain file '{filepath}': {e}", file=sys.stderr)
         sys.exit(1)
 
-    # +++ DEBUG PRINT +++
-    print(f"DEBUG CHECKOUT (get_last_block_...): Returning last_block_hash: {last_block_hash.hex()}", file=sys.stderr)
     return last_block_hash, current_state, case_id, creator, item_exists, block_count
 
 def handle_checkout(args):
@@ -122,8 +115,6 @@ def handle_checkout(args):
     last_block_hash, current_state, case_id, creator, item_exists, block_count = get_last_block_and_item_state(
         blockchain_file_path, item_id_int
     )
-    # +++ DEBUG PRINT +++
-    print(f"DEBUG CHECKOUT (handle_checkout): Received from get_last_block -> last_block_hash: {last_block_hash.hex()}", file=sys.stderr)
 
     if not item_exists:
         print(f"Error: Item ID '{item_id_int}' does not exist in the blockchain.", file=sys.stderr)
@@ -160,8 +151,6 @@ def handle_checkout(args):
                 else:
                     owner_role = "POLICE" # Fallback
 
-            # +++ DEBUG PRINT +++
-            print(f"DEBUG CHECKOUT (handle_checkout): Creating new Block with previous_hash: {last_block_hash.hex()}", file=sys.stderr)
             # Create a new block
             new_block = Block(
                 previous_hash=last_block_hash,

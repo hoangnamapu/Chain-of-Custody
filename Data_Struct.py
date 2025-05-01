@@ -155,7 +155,7 @@ class Block:
                  aes_key: bytes = PROJECT_AES_KEY):
 
         # +++ DEBUG PRINT +++
-        print(f"DEBUG DATA_STRUCT (Block.__init__): Received previous_hash arg: {previous_hash!r}", file=sys.stderr)
+        # # print(f"DEBUG DATA_STRUCT (Block.__init__): Received previous_hash arg: {previous_hash!r}", file=sys.stderr)
 
         # (Input validation for prev_hash, case_id, evidence_item_id, state, creator remains the same)
         if previous_hash == 0: self.previous_hash = 0
@@ -170,7 +170,7 @@ class Block:
         if len(creator_bytes) > CREATOR_SIZE: raise ValueError(f"Block init failed: Creator '{creator}' exceeds max length of {CREATOR_SIZE} bytes when UTF-8 encoded")
 
         # +++ DEBUG PRINT +++
-        print(f"DEBUG DATA_STRUCT (Block.__init__): Stored self.previous_hash: {self.previous_hash!r}", file=sys.stderr)
+        # # print(f"DEBUG DATA_STRUCT (Block.__init__): Stored self.previous_hash: {self.previous_hash!r}", file=sys.stderr)
 
         # (Owner validation and padding fix remains the same)
         try: owner_bytes_unpadded = owner.encode('utf-8')
@@ -243,12 +243,12 @@ class Block:
     def pack(self) -> bytes:
         try:
             # +++ DEBUG PRINT +++
-            print(f"DEBUG DATA_STRUCT (Block.pack): Packing with self.previous_hash: {self.previous_hash!r}", file=sys.stderr)
+            # # print(f"DEBUG DATA_STRUCT (Block.pack): Packing with self.previous_hash: {self.previous_hash!r}", file=sys.stderr)
 
             prev_hash_bytes = b'\x00' * PREV_HASH_SIZE if self.previous_hash == 0 else self.previous_hash
 
             # +++ DEBUG PRINT +++
-            print(f"DEBUG DATA_STRUCT (Block.pack): Actual bytes being packed for prev_hash: {prev_hash_bytes.hex()}", file=sys.stderr)
+            # # print(f"DEBUG DATA_STRUCT (Block.pack): Actual bytes being packed for prev_hash: {prev_hash_bytes.hex()}", file=sys.stderr)
 
             packed_header = struct.pack(
                 BLOCK_HEADER_FORMAT, prev_hash_bytes, self.timestamp_float,
@@ -347,12 +347,12 @@ def unpack_block(block_bytes: bytes) -> dict | None:
         prev_hash_val = unpacked_header[0]
 
         # +++ DEBUG PRINT +++
-        print(f"DEBUG DATA_STRUCT (unpack_block): Unpacked raw prev_hash bytes: {prev_hash_val.hex()}", file=sys.stderr)
+        # # print(f"DEBUG DATA_STRUCT (unpack_block): Unpacked raw prev_hash bytes: {prev_hash_val.hex()}", file=sys.stderr)
 
         prev_hash_display = 0 if prev_hash_val == b'\x00' * PREV_HASH_SIZE else prev_hash_val
 
         # +++ DEBUG PRINT +++
-        print(f"DEBUG DATA_STRUCT (unpack_block): Formatted prev_hash_display: {prev_hash_display!r}", file=sys.stderr)
+        # # print(f"DEBUG DATA_STRUCT (unpack_block): Formatted prev_hash_display: {prev_hash_display!r}", file=sys.stderr)
 
         data_payload = block_bytes[BLOCK_HEADER_SIZE:]
         declared_data_len = unpacked_header[7]
