@@ -143,7 +143,6 @@ def handle_show_history(args):
         sys.exit(1)
 
 def handle_remove(args):
-
     print(f"Executing: remove (Item: {args.i}, Reason: {args.why}, Owner: {args.owner})")
     
     try:
@@ -157,7 +156,6 @@ def handle_remove(args):
         # Catch any unexpected errors that might occur
         print(f"An unexpected error occurred while running the remove command: {e}", file=sys.stderr)
         sys.exit(1)
-
 
 def handle_verify(args):
     print(f"Executing: verify")
@@ -200,7 +198,7 @@ def main():
     #add 
     parser_add = subparsers.add_parser('add', help='Add a new evidence item')
     parser_add.add_argument('-c', type=str, required=True, help='Case ID (UUID format)')
-    parser_add.add_argument('-i', type=str, required=True, action='append', help='Item ID(s)')
+    parser_add.add_argument('-i', type=str, required=True, nargs='+', help='Item ID(s)')
     parser_add.add_argument('-g', type=str, required=True, help='Creator name')
     parser_add.add_argument('-p', type=str, required=True, help="Password")
     parser_add.set_defaults(func=handle_add)
@@ -252,7 +250,7 @@ def main():
     parser_remove.add_argument('-p', type=str, required=True, help="Password (creator's)")
     parser_remove.set_defaults(func=handle_remove)
 
-        #verify 
+    #verify 
     parser_verify = subparsers.add_parser('verify', help='Verify blockchain integrity')
     parser_verify.set_defaults(func=handle_verify)
 
@@ -284,3 +282,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
