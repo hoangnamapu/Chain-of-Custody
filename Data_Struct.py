@@ -138,7 +138,11 @@ class Block:
                  creator: str,
                  owner: str,
                  data: bytes,
-                 aes_key: bytes = PROJECT_AES_KEY):
+                 aes_key: bytes = PROJECT_AES_KEY,
+                 timestamp=None):
+
+        self.encrypted_case_id = self._encrypt_uuid(case_id, aes_key)
+        self.encrypted_case_id = self._encrypt_envidence_id(evidence_item_id, aes_key)
 
         # Accept integer 0 for prev_hash and store as int, else validate as bytes
         if previous_hash == 0:
@@ -211,6 +215,19 @@ class Block:
 
         self.data_length = len(data)
         self.data = data
+
+    def _encrypt_uuid(self, uuid_obj, aes_key):
+        """Encrypt a UUID object using AES ECB"""
+        cipher = cipher.AES.new(aes_key, cipher.AES.MODE_ECB)
+        uuid_bytes = uuid_obj.bytes
+        return cipher.encrypt(uuid_bytes)
+    
+    def _encrypt_evidence_id(self, item_id, aes_key):
+        """Encrypt a 4-byte evidence ID using AES ECB"""
+        cipher = cipher.AES.new(aes_key, cipher.AES.MODE_ECB)
+        item_bytes = item_id.to_bytes(4, 'big')
+        padded = item_bytes.ljust(16, b'\x00')
+        return cipher.encrypt(padded)
 
     def pack(self) -> bytes:
         try:

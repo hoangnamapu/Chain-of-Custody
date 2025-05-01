@@ -212,7 +212,8 @@ def handle_checkout(args):
                 creator=creator,
                 owner=owner_role,
                 data=b'',
-                aes_key=PROJECT_AES_KEY
+                aes_key=PROJECT_AES_KEY,
+                timestamp=None
             )
             
             # Write the block to the file

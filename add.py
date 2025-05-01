@@ -327,8 +327,6 @@ def handle_add(args):
                 else:
                     prev_hash_for_block = last_hash_for_new_block
 
-                default_owner_for_add = "" # or "" if your Block class allows it
-
                 try:
                     new_block = Block(
                         previous_hash=prev_hash_for_block,
@@ -336,7 +334,7 @@ def handle_add(args):
                         evidence_item_id=item_id,
                         state="CHECKEDIN",
                         creator=creator_str,
-                        owner=default_owner_for_add,
+                        owner="",
                         data=b'',
                         aes_key=PROJECT_AES_KEY
                     )
