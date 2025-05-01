@@ -130,8 +130,8 @@ def handle_remove(args):
     """Handles the 'bchoc remove' command to remove an evidence item."""
     provided_password = args.p
     item_id_str = args.i
-    reason = args.why  # Note: Using why instead of y
-    owner_info = getattr(args, 'owner', None)  # Optional owner info
+    reason = args.y  # Changed from args.why to args.y to match the argument name
+    owner_info = getattr(args, 'o', None)  # Changed from 'owner' to 'o' to match the argument name
     
     # Validate the provided password (must be creator's password)
     if not is_valid_creator_password(provided_password):
@@ -175,34 +175,36 @@ def handle_remove(args):
         sys.exit(1)
     
     # Validate reason (should be one of DISPOSED, DESTROYED, or RELEASED)
-    if reason not in ["DISPOSED", "DESTROYED", "RELEASED"]:
-        print(f"Error: Invalid reason '{reason}'. Must be one of DISPOSED, DESTROYED, or RELEASED.", file=sys.stderr)
+    valid_reasons = ["DISPOSED", "DESTROYED", "RELEASED"]
+    if reason not in valid_reasons:
+        print(f"Error: Invalid reason '{reason}'. Must be one of {', '.join(valid_reasons)}.", file=sys.stderr)
         sys.exit(1)
     
     # If reason is RELEASED, owner info must be provided
-    if reason == "RELEASED" and not owner_info:
-        print("Error: Owner information (-o) must be provided when reason is RELEASED.", file=sys.stderr)
-        sys.exit(1)
+    if reason == "RELEASED":
+        if not owner_info:
+            print("Error: Owner information (-o) must be provided when reason is RELEASED.", file=sys.stderr)
+            sys.exit(1)
         
-    # Set owner role based on the removal reason
-    owner_role = ""
-    if reason == "RELEASED" and owner_info:
-        owner_role = "Police"  # Default owner for RELEASED items
+        # Validate owner info is not empty
+        if not owner_info.strip():
+            print("Error: Owner information cannot be empty.", file=sys.stderr)
+            sys.exit(1)
+    
+    # Create data for the block (owner info if provided)
+    data = owner_info.encode('utf-8') if owner_info else b''
     
     # Add a new block with the removal state
     try:
         with open(blockchain_file_path, 'ab') as f:
-            # Create data for the block (owner info if provided)
-            data = owner_info.encode('utf-8') if owner_info else b''
-            
             # Create a new block
             new_block = Block(
                 previous_hash=last_block_hash,
                 case_id=case_id,
                 evidence_item_id=item_id_int,
-                state=reason,  # Use the reason (DISPOSED, DESTROYED, or RELEASED)
+                state=reason,
                 creator=creator,
-                owner=owner_role,  # Use determined owner role
+                owner="Police" if reason == "RELEASED" else "",  # Owner role for RELEASED items
                 data=data,
                 aes_key=PROJECT_AES_KEY
             )
@@ -214,7 +216,7 @@ def handle_remove(args):
             print(f"> Case: {case_id}")
             print(f"> Removed item: {item_id_int}")
             print(f"> Reason: {reason}")
-            if owner_info:
+            if reason == "RELEASED":
                 print(f"> Owner: {owner_info}")
             print(f"> Time of action: {new_block.get_timestamp_iso()}")
             
