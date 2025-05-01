@@ -155,9 +155,9 @@ def handle_remove(args):
         sys.exit(1)
     
     # If reason is RELEASED, owner info must be provided
-    if reason == "RELEASED" and not owner_info:
-        print("Error: Owner information (-o) must be provided when reason is RELEASED.", file=sys.stderr)
-        sys.exit(1)
+    #if reason == "RELEASED" and not owner_info:
+        #print("Error: Owner information (-o) must be provided when reason is RELEASED.", file=sys.stderr)
+        #sys.exit(1)
         
     # Set owner role based on the removal reason
     owner_role = ""
