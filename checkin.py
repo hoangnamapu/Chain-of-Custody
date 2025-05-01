@@ -90,36 +90,24 @@ def get_last_block_and_item_state(filepath, item_id_int):
                     block_count += 1
                     
                     # Check if this block is for our item
-                    try:
-                        # The evidence ID is stored as a hex string in unpack_block
-                        encrypted_evidence_id = bytes.fromhex(block_data['encrypted_evidence_id'])
-                        decrypted_padded_bytes = decrypt_aes_ecb(PROJECT_AES_KEY, encrypted_evidence_id)
-                        original_bytes = decrypted_padded_bytes[:4]
-                        if len(original_bytes) < 4:
-                            raise ValueError("Decrypted bytes insufficient for integer conversion")
-                        
-                        block_item_id = int.from_bytes(original_bytes, 'big')
-                        
-                        if block_item_id == item_id_int:
-                            item_exists = True
-                            current_state = block_data['state_str']
-                            
-                            # Get the case ID
-                            if case_id is None:
-                                try:
-                                    encrypted_case_id = block_data['encrypted_case_id']
-                                    if len(encrypted_case_id) >= 16:
-                                        uuid_bytes = encrypted_case_id[:16]
-                                        case_id = uuid.UUID(bytes=uuid_bytes)
-                                except Exception:
-                                    pass
-                            
-                            # Get the creator
-                            if creator is None:
-                                creator = block_data['creator_str']
-                    except Exception:
-                        # Skip this block if decryption fails
-                        pass
+                    block_data = unpack_block(full_block_bytes) # Call the modified unpack_block
+
+                # Use the pre-decrypted values from unpack_block
+                if block_data and block_data.get('state_str') != "INITIAL":
+                    block_item_id = block_data.get('decrypted_item_id') # Get decrypted ID (int or None)
+
+                    if block_item_id is not None and block_item_id == item_id_int:
+                        item_exists = True
+                        current_state = block_data.get('state_str') # Get latest state
+                        # Get the case ID (use decrypted if available)
+                        if case_id is None:
+                            case_id = block_data.get('decrypted_case_uuid')
+                        # Get the creator (only need the first time)
+                        if creator is None:
+                            creator = block_data.get('creator_str')
+
+                if block_data:
+                    block_count += 1 # Increment block count regardless of item match
                 
                 last_block_hash = block_hash
                 current_pos += block_size
@@ -184,19 +172,33 @@ def handle_checkin(args):
     # Add a new block with CHECKEDIN state
     try:
         with open(blockchain_file_path, 'ab') as f:
-            # Get the owner role from the provided password
+            # Get the owner role from the provided password (Ensure uppercase)
             owner_role = None
             if provided_password == os.getenv("BCHOC_PASSWORD_POLICE"):
-                owner_role = "Police"
+                owner_role = "POLICE" # Uppercase
             elif provided_password == os.getenv("BCHOC_PASSWORD_LAWYER"):
-                owner_role = "Lawyer"
+                owner_role = "LAWYER" # Uppercase
             elif provided_password == os.getenv("BCHOC_PASSWORD_ANALYST"):
-                owner_role = "Analyst"
+                owner_role = "ANALYST" # Uppercase
             elif provided_password == os.getenv("BCHOC_PASSWORD_EXECUTIVE"):
-                owner_role = "Executive"
-            else:
-                owner_role = "Creator"  # Default if it's the creator password
-            
+                owner_role = "EXECUTIVE" # Uppercase
+            elif provided_password == os.getenv("BCHOC_PASSWORD_CREATOR"):
+                # If creator password used, assign a default OWNER role in uppercase.
+                # Using POLICE as a sensible default if the role exists.
+                if os.getenv("BCHOC_PASSWORD_POLICE"):
+                    owner_role = "POLICE"
+                elif os.getenv("BCHOC_PASSWORD_LAWYER"):
+                    owner_role = "LAWYER"
+                elif os.getenv("BCHOC_PASSWORD_ANALYST"):
+                    owner_role = "ANALYST"
+                elif os.getenv("BCHOC_PASSWORD_EXECUTIVE"):
+                    owner_role = "EXECUTIVE"
+                else:
+                    # Fallback if no standard owner roles are defined (unlikely)
+                    owner_role = "POLICE" # Using POLICE as a placeholder default
+            # Note: The original code had a "Creator" default, which is not in ALLOWED_OWNERS.
+            # The logic above assigns a valid OWNER role instead when the creator performs checkin.
+
             # Create a new block
             new_block = Block(
                 previous_hash=last_block_hash,
