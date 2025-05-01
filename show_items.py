@@ -78,7 +78,7 @@ def get_case_items(filepath, case_id_uuid):
                         encrypted_case_id = block_data['encrypted_case_id']
                         if len(encrypted_case_id) >= 16:
                             uuid_bytes = encrypted_case_id[:16]
-                            block_case_id = uuid.UUID(bytes=uuid_bytes)
+                            block_case_id = block_data.get('decrypted_case_uuid')
                             
                             # Check if this block belongs to our case
                             if block_case_id == case_id_uuid:
