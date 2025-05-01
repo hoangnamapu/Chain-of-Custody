@@ -81,6 +81,11 @@ def get_last_block_and_item_state(filepath, item_id_int):
                 
                 # Unpack block data
                 block_data = unpack_block(full_block_bytes)
+                if block_data and block_data.get('state_str') != "INITIAL":
+                    block_item_id = block_data.get('decrypted_item_id')
+                    if block_item_id is not None and block_item_id == item_id_int:
+                        # Process as needed
+                        pass
                 if block_data:
                     block_count += 1
                     

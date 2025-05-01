@@ -39,6 +39,7 @@ def get_last_block_and_item_state(filepath, item_id_int):
     - case_id: The case ID associated with the item
     - creator: The original creator of the item
     - item_exists: Boolean indicating if the item exists in the chain
+    - block_count: Number of blocks processed
     """
     last_block_hash = b'\x00' * 32  # Default for empty chain
     current_state = None
@@ -77,45 +78,19 @@ def get_last_block_and_item_state(filepath, item_id_int):
                 
                 # Unpack block data
                 block_data = unpack_block(full_block_bytes)
+                if block_data and block_data.get('state_str') != "INITIAL":
+                    block_item_id = block_data.get('decrypted_item_id')
+                    if block_item_id is not None and block_item_id == item_id_int:
+                        item_exists = True
+                        current_state = block_data.get('state_str')
+                        # Get the case ID
+                        if case_id is None:
+                            case_id = block_data.get('decrypted_case_uuid')
+                        # Get the creator
+                        if creator is None:
+                            creator = block_data.get('creator_str')
                 if block_data:
                     block_count += 1
-                    
-                    # Check if this block is for our item
-                    try:
-                        # The evidence ID is stored as a hex string in unpack_block
-                        encrypted_evidence_id = block_data['encrypted_evidence_id']
-                        evidence_id_bytes = bytes.fromhex(encrypted_evidence_id) if isinstance(encrypted_evidence_id, str) else encrypted_evidence_id
-                        
-                        # Only use the first 16 bytes (AES block size)
-                        evidence_id_bytes = evidence_id_bytes[:16] if len(evidence_id_bytes) >= 16 else evidence_id_bytes
-                        
-                        decrypted_padded_bytes = decrypt_aes_ecb(PROJECT_AES_KEY, evidence_id_bytes)
-                        original_bytes = decrypted_padded_bytes[:4]
-                        if len(original_bytes) < 4:
-                            raise ValueError("Decrypted bytes insufficient for integer conversion")
-                        
-                        block_item_id = int.from_bytes(original_bytes, 'big')
-                        
-                        if block_item_id == item_id_int:
-                            item_exists = True
-                            current_state = block_data['state_str']
-                            
-                            # Get the case ID
-                            if case_id is None:
-                                try:
-                                    encrypted_case_id = block_data['encrypted_case_id']
-                                    if len(encrypted_case_id) >= 16:
-                                        uuid_bytes = encrypted_case_id[:16]
-                                        case_id = uuid.UUID(bytes=uuid_bytes)
-                                except Exception:
-                                    pass
-                            
-                            # Get the creator
-                            if creator is None:
-                                creator = block_data['creator_str']
-                    except Exception:
-                        # Skip this block if decryption fails
-                        pass
                 
                 last_block_hash = block_hash
                 current_pos += block_size
