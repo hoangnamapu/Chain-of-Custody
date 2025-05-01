@@ -84,15 +84,11 @@ def get_case_items(filepath, case_id_uuid):
                             if block_case_id == case_id_uuid:
                                 # Extract and decrypt the item ID
                                 # Convert hex string to bytes if necessary
+                                # Use Data_Struct's specialized evidence ID decryption function
                                 encrypted_evidence_id = block_data['encrypted_evidence_id']
-                                evidence_id_bytes = bytes.fromhex(encrypted_evidence_id) if isinstance(encrypted_evidence_id, str) else encrypted_evidence_id
-                                
-                                # Only use the first 16 bytes (AES block size)
-                                evidence_id_bytes = evidence_id_bytes[:16] if len(evidence_id_bytes) >= 16 else evidence_id_bytes
-                                
-                                decrypted_padded_bytes = decrypt_aes_ecb(PROJECT_AES_KEY, evidence_id_bytes)
-                                original_bytes = decrypted_padded_bytes[:4]
-                                item_id = int.from_bytes(original_bytes, 'big')
+                                item_id = Data_Struct.decrypt_evidence_id_from_packed(encrypted_evidence_id)
+                                if item_id is None:
+                                    continue
                                 
                                 # Add to the unique items set
                                 unique_items.add(item_id)
@@ -139,8 +135,8 @@ def handle_show_items(args):
     # Get all items for the case
     items = get_case_items(blockchain_file_path, case_id_uuid)
     
-    # Print all items
+    # Print all items, remove debug message
     for item_id in sorted(items):
-        print(f"Item: {item_id}")
+        print(item_id)
     
     sys.exit(0)

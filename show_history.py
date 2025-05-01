@@ -86,25 +86,15 @@ def get_blockchain_history(filepath, case_id_filter=None, item_id_filter=None):
                 block_data = unpack_block(full_block_bytes)
                 if block_data and block_data['state_str'] != "INITIAL":
                     try:
-                        # Extract and decrypt case ID
+                        # Use Data_Struct's function to properly decrypt the case ID
                         encrypted_case_id = block_data['encrypted_case_id']
-                        if len(encrypted_case_id) >= 16:
-                            uuid_bytes = encrypted_case_id[:16]
-                            block_case_id = uuid.UUID(bytes=uuid_bytes)
-                            
-                            # Extract and decrypt item ID
-                            # Convert hex string to bytes if necessary
+                        block_case_id = Data_Struct.decrypt_case_id_from_packed(encrypted_case_id)
+                        if block_case_id is not None:
+                            # Use Data_Struct's function to properly decrypt the evidence ID
                             encrypted_evidence_id = block_data['encrypted_evidence_id']
-                            evidence_id_bytes = bytes.fromhex(encrypted_evidence_id) if isinstance(encrypted_evidence_id, str) else encrypted_evidence_id
-                            
-                            # Only use the first 16 bytes (AES block size)
-                            evidence_id_bytes = evidence_id_bytes[:16] if len(evidence_id_bytes) >= 16 else evidence_id_bytes
-                            
-                            decrypted_padded_bytes = decrypt_aes_ecb(PROJECT_AES_KEY, evidence_id_bytes)
-                            original_bytes = decrypted_padded_bytes[:4]
-                            if len(original_bytes) < 4:
-                                raise ValueError("Decrypted bytes insufficient for integer conversion")
-                            block_item_id = int.from_bytes(original_bytes, 'big')
+                            block_item_id = Data_Struct.decrypt_evidence_id_from_packed(encrypted_evidence_id)
+                            if block_item_id is None:
+                                continue
                             
                             # Apply filters
                             case_match = case_id_filter is None or block_case_id == case_id_filter
@@ -196,17 +186,16 @@ def handle_show_history(args):
         history_entries = history_entries[:num_entries]
     
     # Display history entries
-    if not history_entries:
-        print("No matching history entries found.")
-    else:
+    if history_entries:
         for i, entry in enumerate(history_entries):
             if i > 0:
                 print()  # Blank line between entries
-            print(f"> Case: {entry.case_id}")
-            print(f"> Item: {entry.item_id}")
-            print(f"> Action: {entry.action}")
-            print(f"> Time: {entry.timestamp}")
-            if entry.owner and entry.owner.strip():
-                print(f"> Owner: {entry.owner}")
+            print(f"Case: {entry.case_id}")
+            print(f"Item: {entry.item_id}")
+            print(f"Action: {entry.action}")
+            print(f"Time: {entry.timestamp}")
+            # Only print owner if it's not empty and there's an action that warrants it
+            if entry.owner and entry.owner.strip() and entry.action in ["CHECKEDOUT", "RELEASED"]:
+                print(f"Owner: {entry.owner}")
     
     sys.exit(0)
