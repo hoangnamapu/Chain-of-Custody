@@ -221,13 +221,11 @@ def main():
 
     #show cases 
     parser_cases = show_subparsers.add_parser('cases', help='Display all case IDs')
-    parser_cases.add_argument('-p', type=str, required=True, help="Password")
     parser_cases.set_defaults(func=handle_show_cases)
 
     #show items 
     parser_items = show_subparsers.add_parser('items', help='Display item IDs for a case')
     parser_items.add_argument('-c', type=str, required=True, help='Case ID (UUID format)')
-    parser_items.add_argument('-p', type=str, required=True, help="Password")
     parser_items.set_defaults(func=handle_show_items)
 
     #show history 

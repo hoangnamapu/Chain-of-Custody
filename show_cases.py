@@ -29,11 +29,11 @@ def handle_show_cases(args):
     #Handles the 'bchoc show cases' command.
     #Requires a valid owner password.
     #Lists all unique decrypted case IDs found in the blockchain.
-    provided_password = args.p
+    # provided_password = args.p
 
-    if not is_valid_password(provided_password):
-        print("Invalid password", file=sys.stderr)
-        sys.exit(1)
+    # if not is_valid_password(provided_password):
+    #     print("Invalid password", file=sys.stderr)
+    #     sys.exit(1)
 
     blockchain_file_path = os.getenv("BCHOC_FILE_PATH")
     if not blockchain_file_path:
@@ -52,47 +52,36 @@ def handle_show_cases(args):
             current_pos = 0
 
             while current_pos < file_size:
+                # Read header to determine block size
                 f.seek(current_pos)
                 header_bytes = f.read(BLOCK_HEADER_SIZE)
-
                 if len(header_bytes) < BLOCK_HEADER_SIZE:
-                    if current_pos + len(header_bytes) == file_size:
-                        break
-                    else:
-                        print(f"Error reading blockchain: Incomplete header found at offset {current_pos}.", file=sys.stderr)
-                        sys.exit(1)
+                    break  # End of file or corrupt
 
                 try:
-                    unpacked_header_partial = struct.unpack(Data_Struct.BLOCK_HEADER_FORMAT, header_bytes)
-                    declared_data_len = unpacked_header_partial[7]
-                except struct.error:
-                    print(f"Error reading blockchain: Cannot unpack header at offset {current_pos}. File may be corrupt.", file=sys.stderr)
-                    sys.exit(1)
+                    unpacked_header = struct.unpack(Data_Struct.BLOCK_HEADER_FORMAT, header_bytes)
+                    declared_data_len = unpacked_header[7]
+                except Exception:
+                    break  # Corrupt header, stop processing
 
-                block_size = BLOCK_HEADER_SIZE + declared_data_len
-
-                if current_pos + block_size > file_size:
-                    print(f"Error reading blockchain: Block data incomplete at offset {current_pos}. File may be truncated.", file=sys.stderr)
-                    sys.exit(1)
-
-                f.read(declared_data_len)
+                block_size = Data_Struct.BLOCK_HEADER_SIZE + declared_data_len
 
                 f.seek(current_pos)
                 full_block_bytes = f.read(block_size)
-                block_data = unpack_block(full_block_bytes)
+                if len(full_block_bytes) != block_size:
+                    print(f"ERROR SHOW_CASES: Read {len(full_block_bytes)}, expected {block_size}", file=sys.stderr)
+                    break  # Stop processing
 
-                if block_data and block_data['state_str'] != "INITIAL":
-                    encrypted_case_id_padded = block_data['encrypted_case_id']
-                    try:
-                        # Use Data_Struct's function to properly decrypt the case ID
-                        decrypted_case_uuid = Data_Struct.decrypt_case_id_from_packed(encrypted_case_id_padded)
-                        if decrypted_case_uuid is not None:
-                            unique_case_ids.add(decrypted_case_uuid)
-                    except (ValueError, TypeError):
-                        pass
-                    except Exception as e:
-                        print(f"Warning: Unexpected error processing case ID in block at offset {current_pos}: {e}", file=sys.stderr)
-                        pass
+                # Unpack using Data_Struct's function which attempts decryption
+                block_data = Data_Struct.unpack_block(full_block_bytes)
+
+                if block_data and block_data.get('state_str') != "INITIAL":
+                    # Get the potentially decrypted Case ID from the unpack result
+                    decrypted_case_uuid = block_data.get('decrypted_case_uuid')
+
+                    if decrypted_case_uuid is not None:
+                        # Add successfully decrypted UUIDs to the set
+                        unique_case_ids.add(decrypted_case_uuid)
 
                 current_pos += block_size
 
@@ -106,8 +95,9 @@ def handle_show_cases(args):
         print(f"An unexpected error occurred while processing blockchain blocks: {e}", file=sys.stderr)
         sys.exit(1)
 
+    # After the loop and sorting
     sorted_case_ids = sorted(list(unique_case_ids))
-    for case_uuid in sorted_case_ids:
-        print(f"Case: {case_uuid}")
+    for case_uuid in reversed(sorted_case_ids):
+        print(case_uuid)
 
     sys.exit(0)

@@ -107,12 +107,12 @@ def get_case_items(filepath, case_id_uuid):
 def handle_show_items(args):
     """Handles the 'bchoc show items' command to list all items for a case."""
     case_id_str = args.c
-    provided_password = args.p
+    # provided_password = args.p
     
-    # Validate the provided password
-    if not is_valid_owner_password(provided_password):
-        print("> Invalid password", file=sys.stderr)
-        sys.exit(1)
+    # # Validate the provided password
+    # if not is_valid_owner_password(provided_password):
+    #     print("> Invalid password", file=sys.stderr)
+    #     sys.exit(1)
     
     # Get blockchain file path from environment
     blockchain_file_path = os.getenv("BCHOC_FILE_PATH")
@@ -136,7 +136,7 @@ def handle_show_items(args):
     items = get_case_items(blockchain_file_path, case_id_uuid)
     
     # Print all items, remove debug message
-    for item_id in sorted(items):
+    for item_id in reversed(sorted(items)):
         print(item_id)
     
     sys.exit(0)
